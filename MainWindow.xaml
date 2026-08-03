@@ -41,11 +41,11 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
                                     <TextBlock Text="DPI" Style="{StaticResource Label}"/>
-                                    <TextBox Text="{Binding Dpi, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <TextBox x:Name="DpiBox" Text="800" TextChanged="DraftNum_TextChanged"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
                                     <TextBlock Text="IN-GAME SENS" Style="{StaticResource Label}"/>
-                                    <TextBox Text="{Binding Sens, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <TextBox x:Name="SensBox" Text="1" TextChanged="DraftNum_TextChanged"/>
                                 </StackPanel>
                             </Grid>
 

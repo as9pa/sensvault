@@ -111,6 +111,23 @@ public partial class MainWindow : Window
         }
     }
 
+    // DPI and sens are parsed one-way instead of two-way bound. A PropertyChanged
+    // binding on a double re-formats and pushes the parsed value back into the TextBox
+    // on every keystroke, which resets the caret to position 0 -- so typing "3.4" lands
+    // as ".43" and only leading-decimal values are reachable. Parsing here avoids the
+    // write-back entirely while keeping the live cm/360 preview.
+    private void DraftNum_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (DpiBox is null || SensBox is null)
+            return;
+
+        _draft.Dpi = ParseOrZero(DpiBox.Text);
+        _draft.Sens = ParseOrZero(SensBox.Text);
+    }
+
+    private static double ParseOrZero(string? s) =>
+        double.TryParse(s, NumberStyles.Float, CultureInfo.CurrentCulture, out var v) ? v : 0;
+
     private void AddGame_Click(object sender, RoutedEventArgs e)
     {
         var name = NgName.Text.Trim();
