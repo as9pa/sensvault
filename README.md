@@ -28,7 +28,8 @@ cm/360     = counts/360 ÷ DPI × 2.54
 - Convert a saved profile to the sensitivity value for any other game at any DPI
 - Edit cells in place; every change is written to disk immediately
 - Search across name, game and notes
-- Type-to-search game picker backed by a built-in library of verified yaw constants
+- Type-to-search picker over 37 built-in games, with yaw constants taken from KovaaK's
+  own scale table (`FovSensConfig.json`) rather than from third-party converter sites
 - Any game not in the library can be added by entering a known cm/360 at any sens/DPI
   pair — the yaw constant is back-solved from it
 
