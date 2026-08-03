@@ -18,12 +18,10 @@ public partial class MainWindow : Window
     [
         "Name",
         "Game",
-        "AimType",
         "Notes",
         "Yaw",
         "Dpi",
         "Sens",
-        "Multiplier",
     ];
 
     private readonly AppData _data;
@@ -99,10 +97,18 @@ public partial class MainWindow : Window
 
     private void GameBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (GameBox.SelectedItem is not Game g)
-            return;
-        _draft.Game = g.Name;
-        _draft.Yaw = g.Yaw;
+        // The box is editable, so typing text that matches nothing leaves SelectedItem null.
+        // Clear the draft in that case rather than silently keeping the previous game's yaw.
+        if (GameBox.SelectedItem is Game g)
+        {
+            _draft.Game = g.Name;
+            _draft.Yaw = g.Yaw;
+        }
+        else
+        {
+            _draft.Game = "";
+            _draft.Yaw = 0;
+        }
     }
 
     private void AddGame_Click(object sender, RoutedEventArgs e)
@@ -177,7 +183,7 @@ public partial class MainWindow : Window
 
         var p = _draft.Clone();
         if (string.IsNullOrWhiteSpace(p.Name))
-            p.Name = $"{p.Game} {p.AimType}".Trim();
+            p.Name = p.Game;
 
         _profiles.Add(p);
         _draft.Name = "";
@@ -258,11 +264,9 @@ public partial class MainWindow : Window
             {
                 Name = $"{dst.Name} (from {src.Name})",
                 Game = dst.Name,
-                AimType = src.AimType,
                 Yaw = dst.Yaw,
                 Dpi = dpi,
                 Sens = sens,
-                Multiplier = 1,
                 Notes = $"Converted from {src.Name}",
             }
         );
@@ -280,7 +284,7 @@ public partial class MainWindow : Window
         var q = Search.Text?.Trim();
         if (string.IsNullOrEmpty(q))
             return true;
-        return Has(p.Name, q) || Has(p.Game, q) || Has(p.AimType, q) || Has(p.Notes, q);
+        return Has(p.Name, q) || Has(p.Game, q) || Has(p.Notes, q);
     }
 
     private static bool Has(string? s, string q) =>

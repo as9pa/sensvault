@@ -6,19 +6,17 @@
              StartupUri="MainWindow.xaml">
     <Application.Resources>
 
-        <!-- Catppuccin Mocha -->
-        <SolidColorBrush x:Key="Base"     Color="#1E1E2E"/>
-        <SolidColorBrush x:Key="Mantle"   Color="#181825"/>
-        <SolidColorBrush x:Key="Crust"    Color="#11111B"/>
-        <SolidColorBrush x:Key="Surface0" Color="#313244"/>
-        <SolidColorBrush x:Key="Surface1" Color="#45475A"/>
-        <SolidColorBrush x:Key="Overlay0" Color="#6C7086"/>
-        <SolidColorBrush x:Key="Subtext"  Color="#A6ADC8"/>
-        <SolidColorBrush x:Key="Text"     Color="#CDD6F4"/>
-        <SolidColorBrush x:Key="Mauve"    Color="#CBA6F7"/>
-        <SolidColorBrush x:Key="Blue"     Color="#89B4FA"/>
-        <SolidColorBrush x:Key="Green"    Color="#A6E3A1"/>
-        <SolidColorBrush x:Key="Red"      Color="#F38BA8"/>
+        <!-- neutral dark: greys and near-white only -->
+        <SolidColorBrush x:Key="Base"     Color="#101317"/>
+        <SolidColorBrush x:Key="Mantle"   Color="#0B0E11"/>
+        <SolidColorBrush x:Key="Crust"    Color="#06080A"/>
+        <SolidColorBrush x:Key="Surface0" Color="#191D22"/>
+        <SolidColorBrush x:Key="Surface1" Color="#272C33"/>
+        <SolidColorBrush x:Key="Overlay0" Color="#6B7480"/>
+        <SolidColorBrush x:Key="Subtext"  Color="#98A1AC"/>
+        <SolidColorBrush x:Key="Text"     Color="#E3E7EC"/>
+        <SolidColorBrush x:Key="Accent"   Color="#E3E7EC"/>
+        <SolidColorBrush x:Key="Red"      Color="#E5645C"/>
 
         <Style x:Key="Label" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource Subtext}"/>
@@ -62,7 +60,7 @@
 
         <Style TargetType="Button">
             <Setter Property="Foreground" Value="{StaticResource Crust}"/>
-            <Setter Property="Background" Value="{StaticResource Mauve}"/>
+            <Setter Property="Background" Value="{StaticResource Accent}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Padding" Value="12,7"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -93,7 +91,7 @@
         </Style>
 
         <Style TargetType="TabItem">
-            <Setter Property="Foreground" Value="{StaticResource Subtext}"/>
+            <Setter Property="Foreground" Value="{StaticResource Overlay0}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
@@ -104,7 +102,7 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter TargetName="b" Property="Background" Value="{StaticResource Surface0}"/>
-                                <Setter Property="Foreground" Value="{StaticResource Mauve}"/>
+                                <Setter Property="Foreground" Value="{StaticResource Text}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -114,7 +112,7 @@
 
         <Style TargetType="prim:DataGridColumnHeader">
             <Setter Property="Background" Value="{StaticResource Mantle}"/>
-            <Setter Property="Foreground" Value="{StaticResource Mauve}"/>
+            <Setter Property="Foreground" Value="{StaticResource Subtext}"/>
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Padding" Value="8,7"/>

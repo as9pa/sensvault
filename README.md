@@ -22,14 +22,15 @@ cm/360     = counts/360 ÷ DPI × 2.54
 
 ## Features
 
-- Named profiles storing game, aim type (hipfire / ADS / scope), DPI, sensitivity,
-  zoom multiplier and notes
-- Sort by any column — cm/360, game, aim type, eDPI, date added
+- Named profiles storing game, DPI, sensitivity and notes, with cm/360, in/360 and eDPI
+  computed for you
+- Sort by any column — cm/360, game, eDPI, date added
 - Convert a saved profile to the sensitivity value for any other game at any DPI
 - Edit cells in place; every change is written to disk immediately
-- Search across name, game, aim type and notes
-- 17 games built in. Add any other by entering a known cm/360 at any sens/DPI pair and
-  the yaw constant is back-solved from it
+- Search across name, game and notes
+- Type-to-search game picker backed by a built-in library of verified yaw constants
+- Any game not in the library can be added by entering a known cm/360 at any sens/DPI
+  pair — the yaw constant is back-solved from it
 
 Profiles live in `%APPDATA%\SensVault\data.json` as plain JSON.
 
@@ -50,5 +51,6 @@ dotnet publish -c Release -o dist
 ## Caveat
 
 Conversions match 360 distance only; field of view is not modelled. Two games at the same
-cm/360 but different FOVs will track differently on screen, which matters most for scoped
-aims. The zoom multiplier field is accurate for games using a 1.0 ADS coefficient.
+cm/360 but different FOVs will track differently on screen. Games whose sensitivity scale
+is FOV-dependent or non-linear are deliberately left out of the built-in library rather
+than approximated with a single constant.

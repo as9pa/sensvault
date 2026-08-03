@@ -8,11 +8,9 @@ public class SensProfile : INotifyPropertyChanged
 {
     private string _name = "";
     private string _game = "";
-    private string _aimType = "Hipfire";
     private double _yaw;
     private double _dpi = 800;
     private double _sens = 1;
-    private double _multiplier = 1;
     private string _notes = "";
 
     public string Name
@@ -20,21 +18,19 @@ public class SensProfile : INotifyPropertyChanged
         get => _name;
         set => Set(ref _name, value);
     }
+
     public string Game
     {
         get => _game;
         set => Set(ref _game, value);
     }
-    public string AimType
-    {
-        get => _aimType;
-        set => Set(ref _aimType, value);
-    }
+
     public string Notes
     {
         get => _notes;
         set => Set(ref _notes, value);
     }
+
     public DateTime Added { get; set; } = DateTime.Now;
 
     public double Yaw
@@ -46,6 +42,7 @@ public class SensProfile : INotifyPropertyChanged
                 Recalc();
         }
     }
+
     public double Dpi
     {
         get => _dpi;
@@ -55,6 +52,7 @@ public class SensProfile : INotifyPropertyChanged
                 Recalc();
         }
     }
+
     public double Sens
     {
         get => _sens;
@@ -65,25 +63,11 @@ public class SensProfile : INotifyPropertyChanged
         }
     }
 
-    /// <summary>ADS or scope coefficient, if this profile is for a zoomed aim. 1 = hipfire.</summary>
-    public double Multiplier
-    {
-        get => _multiplier;
-        set
-        {
-            if (Set(ref _multiplier, value))
-                Recalc();
-        }
-    }
+    [JsonIgnore]
+    public double Cm360 => SensMath.Cm360(Yaw, Sens, Dpi);
 
     [JsonIgnore]
-    public double EffectiveSens => Sens * (Multiplier <= 0 ? 1 : Multiplier);
-
-    [JsonIgnore]
-    public double Cm360 => SensMath.Cm360(Yaw, EffectiveSens, Dpi);
-
-    [JsonIgnore]
-    public double In360 => SensMath.In360(Yaw, EffectiveSens, Dpi);
+    public double In360 => SensMath.In360(Yaw, Sens, Dpi);
 
     [JsonIgnore]
     public double Edpi => Dpi * Sens;
@@ -93,18 +77,15 @@ public class SensProfile : INotifyPropertyChanged
         {
             Name = Name,
             Game = Game,
-            AimType = AimType,
             Notes = Notes,
             Yaw = Yaw,
             Dpi = Dpi,
             Sens = Sens,
-            Multiplier = Multiplier,
             Added = DateTime.Now,
         };
 
     private void Recalc()
     {
-        OnChanged(nameof(EffectiveSens));
         OnChanged(nameof(Cm360));
         OnChanged(nameof(In360));
         OnChanged(nameof(Edpi));

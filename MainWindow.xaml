@@ -29,17 +29,9 @@
 
                             <TextBlock Text="GAME" Style="{StaticResource Label}"/>
                             <ComboBox x:Name="GameBox" IsSynchronizedWithCurrentItem="False"
+                                      IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
+                                      MaxDropDownHeight="380"
                                       SelectionChanged="GameBox_SelectionChanged"/>
-
-                            <TextBlock Text="AIM TYPE" Style="{StaticResource Label}"/>
-                            <ComboBox IsEditable="True"
-                                      Text="{Binding AimType, UpdateSourceTrigger=PropertyChanged}">
-                                <ComboBoxItem Content="Hipfire"/>
-                                <ComboBoxItem Content="ADS"/>
-                                <ComboBoxItem Content="Scope"/>
-                                <ComboBoxItem Content="Sniper"/>
-                                <ComboBoxItem Content="Aim trainer"/>
-                            </ComboBox>
 
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -57,9 +49,6 @@
                                 </StackPanel>
                             </Grid>
 
-                            <TextBlock Text="ADS / ZOOM MULTIPLIER (1 = HIPFIRE)" Style="{StaticResource Label}"/>
-                            <TextBox Text="{Binding Multiplier, UpdateSourceTrigger=PropertyChanged}"/>
-
                             <TextBlock Text="NOTES" Style="{StaticResource Label}"/>
                             <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}"
                                      AcceptsReturn="True" Height="52" TextWrapping="Wrap"/>
@@ -68,7 +57,7 @@
                                     Padding="12,10" Margin="0,16,0,0">
                                 <StackPanel>
                                     <TextBlock Text="PREVIEW" Style="{StaticResource Label}" Margin="0,0,0,4"/>
-                                    <TextBlock Foreground="{StaticResource Green}" FontSize="22" FontWeight="Bold"
+                                    <TextBlock Foreground="{StaticResource Text}" FontSize="22" FontWeight="Bold"
                                                Text="{Binding Cm360, StringFormat={}{0:F1} cm/360}"/>
                                     <TextBlock Foreground="{StaticResource Subtext}" FontSize="11" Margin="0,2,0,0"
                                                Text="{Binding In360, StringFormat={}{0:F2} in/360}"/>
@@ -94,6 +83,8 @@
 
                             <TextBlock Text="TO GAME" Style="{StaticResource Label}"/>
                             <ComboBox x:Name="ToBox" IsSynchronizedWithCurrentItem="False"
+                                      IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
+                                      MaxDropDownHeight="380"
                                       SelectionChanged="Convert_Changed"/>
 
                             <TextBlock Text="TARGET DPI" Style="{StaticResource Label}"/>
@@ -103,7 +94,7 @@
                                     Padding="12,10" Margin="0,16,0,0">
                                 <StackPanel>
                                     <TextBlock Text="SET IN-GAME SENS TO" Style="{StaticResource Label}" Margin="0,0,0,4"/>
-                                    <TextBlock x:Name="ConvResult" Foreground="{StaticResource Blue}"
+                                    <TextBlock x:Name="ConvResult" Foreground="{StaticResource Text}"
                                                FontSize="26" FontWeight="Bold" Text="--"/>
                                     <TextBlock x:Name="ConvDetail" Foreground="{StaticResource Subtext}"
                                                FontSize="11" Margin="0,2,0,0" TextWrapping="Wrap"/>
@@ -196,12 +187,11 @@
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="NAME" Binding="{Binding Name}" Width="1.4*"/>
                     <DataGridTextColumn Header="GAME" Binding="{Binding Game}" Width="1.5*"/>
-                    <DataGridTextColumn Header="TYPE" Binding="{Binding AimType}" Width="0.8*"/>
                     <DataGridTextColumn Header="CM/360" Binding="{Binding Cm360, StringFormat={}{0:F1}}"
                                         IsReadOnly="True" Width="0.7*">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="#A6E3A1"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
                                 <Setter Property="FontWeight" Value="SemiBold"/>
                             </Style>
                         </DataGridTextColumn.ElementStyle>
@@ -210,7 +200,6 @@
                                         IsReadOnly="True" Width="0.7*"/>
                     <DataGridTextColumn Header="DPI" Binding="{Binding Dpi}" Width="0.6*"/>
                     <DataGridTextColumn Header="SENS" Binding="{Binding Sens, StringFormat={}{0:G6}}" Width="0.7*"/>
-                    <DataGridTextColumn Header="MULT" Binding="{Binding Multiplier, StringFormat={}{0:G6}}" Width="0.6*"/>
                     <DataGridTextColumn Header="EDPI" Binding="{Binding Edpi, StringFormat={}{0:F0}}"
                                         IsReadOnly="True" Width="0.6*"/>
                     <DataGridTextColumn Header="NOTES" Binding="{Binding Notes}" Width="1.2*"/>
