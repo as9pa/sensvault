@@ -1,0 +1,10 @@
+bin/
+obj/
+dist/
+publish/
+
+.vs/
+*.user
+*.suo
+*.userprefs
+*.log
