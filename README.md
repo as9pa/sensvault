@@ -1,57 +1,16 @@
-# SensVault
+# sensvault
 
-A small Windows desktop app for storing mouse sensitivities across games and converting
-between them, using **cm/360** — the physical distance the mouse travels for one full
-in-game turn — as the common unit.
+cm/360 sens storage with huge library of games
 
-Built to replace the browser-tab-plus-notepad routine for keeping sensitivities in sync.
-
-## Why cm/360
-
-eDPI (DPI × in-game sens) only compares within a single game, because every engine picks
-its own sensitivity scale. cm/360 is a physical measurement, so it is directly comparable
-between any two titles.
-
-Every conversion derives from one number per game: the **yaw constant**, the degrees the
-camera rotates per mouse count at in-game sensitivity 1.0.
+sort by name, game, dpi, in-game sens, edpi, cm/360
 
 ```
 counts/360 = 360 / (yaw × sens)
 cm/360     = counts/360 ÷ DPI × 2.54
 ```
 
-## Features
+each sensitivity is stored in `%APPDATA%\SensVault\data.json`
 
-- Named profiles storing game, DPI, sensitivity and notes, with cm/360, in/360 and eDPI
-  computed for you
-- Sort by any column — cm/360, game, eDPI, date added
-- Convert a saved profile to the sensitivity value for any other game at any DPI
-- Edit cells in place; every change is written to disk immediately
-- Search across name, game and notes
-- Type-to-search picker over 37 built-in games, with yaw constants taken from KovaaK's
-  own scale table (`FovSensConfig.json`) rather than from third-party converter sites
-- Any game not in the library can be added by entering a known cm/360 at any sens/DPI
-  pair — the yaw constant is back-solved from it
+# requirements
 
-Profiles live in `%APPDATA%\SensVault\data.json` as plain JSON.
-
-## Build
-
-Requires the .NET 10 SDK.
-
-```
-dotnet run --project SensVault.csproj
-```
-
-To produce a standalone copy:
-
-```
-dotnet publish -c Release -o dist
-```
-
-## Caveat
-
-Conversions match 360 distance only; field of view is not modelled. Two games at the same
-cm/360 but different FOVs will track differently on screen. Games whose sensitivity scale
-is FOV-dependent or non-linear are deliberately left out of the built-in library rather
-than approximated with a single constant.
+Requires the .NET 10 SDK
