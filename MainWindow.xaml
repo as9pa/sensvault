@@ -33,6 +33,9 @@
                                       MaxDropDownHeight="380"
                                       SelectionChanged="GameBox_SelectionChanged"/>
 
+                            <TextBlock Text="DPI" Style="{StaticResource Label}"/>
+                            <TextBox x:Name="DpiBox" Text="800" TextChanged="DpiBox_TextChanged"/>
+
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -40,27 +43,29 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="DPI" Style="{StaticResource Label}"/>
-                                    <TextBox x:Name="DpiBox" Text="800" TextChanged="DraftNum_TextChanged"/>
+                                    <TextBlock Text="IN-GAME SENS" Style="{StaticResource Label}"/>
+                                    <TextBox x:Name="SensBox" Text="1" TextChanged="SensBox_TextChanged"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Text="IN-GAME SENS" Style="{StaticResource Label}"/>
-                                    <TextBox x:Name="SensBox" Text="1" TextChanged="DraftNum_TextChanged"/>
+                                    <TextBlock Text="CM/360" Style="{StaticResource Label}"/>
+                                    <TextBox x:Name="CmBox" TextChanged="CmBox_TextChanged"/>
                                 </StackPanel>
                             </Grid>
+                            <TextBlock Foreground="{StaticResource Overlay0}" FontSize="11" Margin="0,5,0,0"
+                                       TextWrapping="Wrap"
+                                       Text="Type either one; the other follows."/>
 
                             <TextBlock Text="NOTES" Style="{StaticResource Label}"/>
                             <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}"
                                      AcceptsReturn="True" Height="52" TextWrapping="Wrap"/>
 
                             <Border Background="{StaticResource Surface0}" CornerRadius="6"
-                                    Padding="12,10" Margin="0,16,0,0">
+                                    Padding="12,9" Margin="0,14,0,0">
                                 <StackPanel>
-                                    <TextBlock Text="PREVIEW" Style="{StaticResource Label}" Margin="0,0,0,4"/>
-                                    <TextBlock Foreground="{StaticResource Text}" FontSize="22" FontWeight="Bold"
-                                               Text="{Binding Cm360, StringFormat={}{0:F1} cm/360}"/>
-                                    <TextBlock Foreground="{StaticResource Subtext}" FontSize="11" Margin="0,2,0,0"
+                                    <TextBlock Foreground="{StaticResource Subtext}" FontSize="12"
                                                Text="{Binding In360, StringFormat={}{0:F2} in/360}"/>
+                                    <TextBlock Foreground="{StaticResource Overlay0}" FontSize="11" Margin="0,3,0,0"
+                                               Text="{Binding Edpi, StringFormat=eDPI {0:F0}}"/>
                                 </StackPanel>
                             </Border>
 
@@ -111,7 +116,7 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
                         <StackPanel>
                             <TextBlock Foreground="{StaticResource Subtext}" TextWrapping="Wrap" FontSize="11"
-                                       Text="Game missing? Look its cm/360 up once on mouse-sensitivity.com for any sens/DPI, enter all three, and the yaw constant is derived for you."/>
+                                       Text="Game missing? Enter a known cm/360 at any sens/DPI and the yaw constant is derived for you."/>
 
                             <TextBlock Text="GAME NAME" Style="{StaticResource Label}"/>
                             <TextBox x:Name="NgName"/>
@@ -144,7 +149,7 @@
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{Binding Name}" Width="190" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Name}" Width="180" TextTrimming="CharacterEllipsis"/>
                                             <TextBlock Text="{Binding Yaw}" Foreground="{StaticResource Overlay0}" FontSize="11"/>
                                         </StackPanel>
                                     </DataTemplate>
@@ -168,12 +173,16 @@
 
             <Grid Grid.Row="0" Margin="0,0,0,12">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="200"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBox Grid.Column="0" x:Name="Search" TextChanged="Search_TextChanged"
-                         Tag="Search" ToolTip="Filter by name, game, type or notes"/>
-                <Button Grid.Column="1" Content="Delete" Style="{StaticResource Ghost}"
+                <ComboBox Grid.Column="0" x:Name="FilterBox" IsSynchronizedWithCurrentItem="False"
+                          MaxDropDownHeight="380" SelectionChanged="Filter_Changed"/>
+                <TextBox Grid.Column="1" x:Name="Search" Margin="8,0,0,0"
+                         TextChanged="Search_TextChanged"
+                         ToolTip="Filter by name, game or notes"/>
+                <Button Grid.Column="2" Content="Delete" Style="{StaticResource Ghost}"
                         Click="Delete_Click" Margin="8,0,0,0"/>
             </Grid>
 
@@ -183,6 +192,10 @@
                       Background="{StaticResource Base}" BorderThickness="0"
                       HorizontalGridLinesBrush="{StaticResource Surface0}"
                       RowHeight="34" SelectionMode="Extended"
+                      AllowDrop="True"
+                      PreviewMouseLeftButtonDown="Grid_PreviewMouseLeftButtonDown"
+                      MouseMove="Grid_MouseMove"
+                      Drop="Grid_Drop"
                       PreviewKeyDown="Grid_PreviewKeyDown">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="NAME" Binding="{Binding Name}" Width="1.4*"/>

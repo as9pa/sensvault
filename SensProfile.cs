@@ -33,6 +33,9 @@ public class SensProfile : INotifyPropertyChanged
 
     public DateTime Added { get; set; } = DateTime.Now;
 
+    /// <summary>Manual position in the list, set by drag-reordering.</summary>
+    public int Order { get; set; }
+
     public double Yaw
     {
         get => _yaw;
@@ -81,6 +84,7 @@ public class SensProfile : INotifyPropertyChanged
             Yaw = Yaw,
             Dpi = Dpi,
             Sens = Sens,
+            Order = Order,
             Added = DateTime.Now,
         };
 

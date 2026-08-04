@@ -6,17 +6,17 @@
              StartupUri="MainWindow.xaml">
     <Application.Resources>
 
-        <!-- neutral dark: greys and near-white only -->
-        <SolidColorBrush x:Key="Base"     Color="#101317"/>
-        <SolidColorBrush x:Key="Mantle"   Color="#0B0E11"/>
-        <SolidColorBrush x:Key="Crust"    Color="#06080A"/>
-        <SolidColorBrush x:Key="Surface0" Color="#191D22"/>
-        <SolidColorBrush x:Key="Surface1" Color="#272C33"/>
-        <SolidColorBrush x:Key="Overlay0" Color="#6B7480"/>
-        <SolidColorBrush x:Key="Subtext"  Color="#98A1AC"/>
-        <SolidColorBrush x:Key="Text"     Color="#E3E7EC"/>
-        <SolidColorBrush x:Key="Accent"   Color="#E3E7EC"/>
-        <SolidColorBrush x:Key="Red"      Color="#E5645C"/>
+        <!-- pure neutral grays, no colour cast -->
+        <SolidColorBrush x:Key="Base"     Color="#141414"/>
+        <SolidColorBrush x:Key="Mantle"   Color="#0F0F0F"/>
+        <SolidColorBrush x:Key="Crust"    Color="#080808"/>
+        <SolidColorBrush x:Key="Surface0" Color="#1E1E1E"/>
+        <SolidColorBrush x:Key="Surface1" Color="#2E2E2E"/>
+        <SolidColorBrush x:Key="Overlay0" Color="#707070"/>
+        <SolidColorBrush x:Key="Subtext"  Color="#9C9C9C"/>
+        <SolidColorBrush x:Key="Text"     Color="#E8E8E8"/>
+        <SolidColorBrush x:Key="Accent"   Color="#E8E8E8"/>
+        <SolidColorBrush x:Key="Red"      Color="#E07070"/>
 
         <Style x:Key="Label" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource Subtext}"/>
@@ -28,6 +28,7 @@
             <Setter Property="Background" Value="{StaticResource Surface0}"/>
             <Setter Property="Foreground" Value="{StaticResource Text}"/>
             <Setter Property="CaretBrush" Value="{StaticResource Text}"/>
+            <Setter Property="SelectionBrush" Value="{StaticResource Surface1}"/>
             <Setter Property="BorderBrush" Value="{StaticResource Surface1}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="6,4"/>
@@ -45,17 +46,151 @@
             </Setter>
         </Style>
 
+        <!-- scrollbar: default WPF chrome is light and looks wrong on dark -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border Background="{StaticResource Surface1}"
+                                                        CornerRadius="5" Margin="2,0"/>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0" Focusable="False"/>
+                                </Track.IncreaseRepeatButton>
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0" Focusable="False"/>
+                                </Track.DecreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="Height" Value="10"/>
+                    <Setter Property="Width" Value="Auto"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- full ComboBox retemplate; the stock one renders a white box on dark themes -->
         <Style TargetType="ComboBox">
             <Setter Property="Foreground" Value="{StaticResource Text}"/>
             <Setter Property="Background" Value="{StaticResource Surface0}"/>
             <Setter Property="BorderBrush" Value="{StaticResource Surface1}"/>
-            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <Border x:Name="Bd"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="4"/>
+                            <ToggleButton Focusable="False" ClickMode="Press" Background="Transparent"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay,
+                                                      RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="Transparent">
+                                            <Path HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                  Margin="0,0,10,0" Data="M0,0 L7,0 L3.5,4.5 Z"
+                                                  Fill="{StaticResource Overlay0}"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <ContentPresenter x:Name="ContentSite" IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                            <TextBox x:Name="PART_EditableTextBox" Visibility="Hidden"
+                                     Background="Transparent" BorderThickness="0" Padding="0"
+                                     Foreground="{StaticResource Text}"
+                                     Margin="{TemplateBinding Padding}" VerticalAlignment="Center"
+                                     IsReadOnly="{TemplateBinding IsReadOnly}"/>
+                            <Popup x:Name="PART_Popup" AllowsTransparency="True" Focusable="False"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom">
+                                <Border Background="{StaticResource Surface0}"
+                                        BorderBrush="{StaticResource Surface1}"
+                                        BorderThickness="1" CornerRadius="4" Margin="0,2,0,0"
+                                        MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <ScrollViewer>
+                                        <ItemsPresenter/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEditable" Value="True">
+                                <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible"/>
+                                <Setter TargetName="ContentSite" Property="Visibility" Value="Hidden"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Overlay0}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style TargetType="ComboBoxItem">
             <Setter Property="Foreground" Value="{StaticResource Text}"/>
-            <Setter Property="Background" Value="{StaticResource Surface0}"/>
-            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="b" Background="Transparent" CornerRadius="3" Margin="3,1"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="b" Property="Background" Value="{StaticResource Surface1}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ListBoxItem">
+            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="b" Background="Transparent" CornerRadius="3" Margin="2,1"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="b" Property="Background" Value="{StaticResource Surface1}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="b" Property="Background" Value="{StaticResource Surface1}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style TargetType="Button">
