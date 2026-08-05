@@ -2,7 +2,8 @@
 
 easy place to store sensitivities across a library of games
 
-sort by name, game, sens, dpi, cm/360
+sort by name, game, sens, dpi, and cm/360
+
 sensitivities are stored in `%APPDATA%\SensVault\data.json`
 
 # download
