@@ -15,4 +15,5 @@ requires windows x64.
 | `SensVault-...-needs-dotnet10.zip` | ~90 kb | **yes** — [.NET 10 desktop runtime](https://dotnet.microsoft.com/en-us/download) |
 
 if you dont have dotnet download standalone
+
 if you have dotnet download the other one
