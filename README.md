@@ -11,9 +11,9 @@ requires windows x64.
 
 | [releases](https://github.com/as9pa/sensvault/releases) | size | needs .NET? |
 |---|---|---|
-| `SensVault-...-standalone.exe` | ~62 mb | **no** — built in runtime |
-| `SensVault-...-needs-dotnet10.zip` | ~90 kb | **yes** — [.NET 10 desktop runtime](https://dotnet.microsoft.com/en-us/download) |
+| `sensvault-...-win-x64.exe` | ~62 mb | **no** — built in runtime |
+| `sensvault-...-win-x64-dotnet.zip` | ~90 kb | **yes** — [.NET 10 desktop runtime](https://dotnet.microsoft.com/en-us/download) |
 
-if you dont have dotnet download standalone
+if you dont have dotnet download the `.exe`
 
-if you have dotnet download the other one
+if you have dotnet download the `.zip`
