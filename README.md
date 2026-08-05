@@ -7,11 +7,11 @@ sensitivities are stored in `%APPDATA%\SensVault\data.json`
 
 # download
 
-grab either one from [releases](https://github.com/as9pa/sensvault/releases). windows x64.
+requires windows x64.
 
-| | size | needs .NET? |
+| [releases](https://github.com/as9pa/sensvault/releases) | size | needs .NET? |
 |---|---|---|
-| `SensVault-...-standalone.exe` | ~62 mb | **no** — the runtime is inside the exe, just run it |
+| `SensVault-...-standalone.exe` | ~62 mb | **no** — built in runtime |
 | `SensVault-...-needs-dotnet10.zip` | ~90 kb | **yes** — [.NET 10 desktop runtime](https://dotnet.microsoft.com/download/dotnet/10.0) |
 
 take the standalone unless you already have .NET 10 installed
