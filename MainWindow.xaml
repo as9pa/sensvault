@@ -6,9 +6,38 @@
         xmlns:local="clr-namespace:SensVault"
         mc:Ignorable="d"
         Title="SensVault" Height="640" Width="1180"
+        MinWidth="990" MinHeight="420"
         Background="{StaticResource Base}"
         TextOptions.TextFormattingMode="Display"
-        FontFamily="Segoe UI" FontSize="13">
+        FontFamily="Segoe UI" FontSize="13"
+        PreviewMouseDown="Window_PreviewMouseDown">
+
+    <Window.Resources>
+        <!-- Rise-and-fade toast. One storyboard, restarted on each copy, so rapid clicks
+             re-arm the timer instead of stacking up. -->
+        <Storyboard x:Key="ToastPop">
+            <DoubleAnimation Storyboard.TargetName="Toast" Storyboard.TargetProperty="Opacity"
+                             To="1" Duration="0:0:0.14"/>
+            <DoubleAnimation Storyboard.TargetName="ToastShift" Storyboard.TargetProperty="Y"
+                             From="10" To="0" Duration="0:0:0.24">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="Toast" Storyboard.TargetProperty="Opacity"
+                             To="0" BeginTime="0:0:1.25" Duration="0:0:0.4"/>
+            <DoubleAnimation Storyboard.TargetName="ToastShift" Storyboard.TargetProperty="Y"
+                             To="8" BeginTime="0:0:1.25" Duration="0:0:0.4">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseIn"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+
+        <Style x:Key="Trimmed" TargetType="TextBlock">
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+    </Window.Resources>
 
     <Grid>
         <Grid.ColumnDefinitions>
@@ -24,17 +53,14 @@
                 <TabItem Header="Profile">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
                         <StackPanel x:Name="DraftPanel">
-                            <TextBlock Text="PROFILE NAME" Style="{StaticResource Label}"/>
+                            <TextBlock Text="Name" Style="{StaticResource Label}"/>
                             <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"/>
 
-                            <TextBlock Text="GAME" Style="{StaticResource Label}"/>
+                            <TextBlock Text="Game" Style="{StaticResource Label}"/>
                             <ComboBox x:Name="GameBox" IsSynchronizedWithCurrentItem="False"
                                       IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
                                       MaxDropDownHeight="380"
                                       SelectionChanged="GameBox_SelectionChanged"/>
-
-                            <TextBlock Text="DPI" Style="{StaticResource Label}"/>
-                            <TextBox x:Name="DpiBox" Text="800" TextChanged="DpiBox_TextChanged"/>
 
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -43,33 +69,24 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="IN-GAME SENS" Style="{StaticResource Label}"/>
+                                    <TextBlock Text="Sensitivity" Style="{StaticResource Label}"/>
                                     <TextBox x:Name="SensBox" Text="1" TextChanged="SensBox_TextChanged"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Text="CM/360" Style="{StaticResource Label}"/>
-                                    <TextBox x:Name="CmBox" TextChanged="CmBox_TextChanged"/>
+                                    <TextBlock Text="DPI" Style="{StaticResource Label}"/>
+                                    <TextBox x:Name="DpiBox" Text="800" TextChanged="DpiBox_TextChanged"/>
                                 </StackPanel>
                             </Grid>
-                            <TextBlock Foreground="{StaticResource Overlay0}" FontSize="11" Margin="0,5,0,0"
-                                       TextWrapping="Wrap"
-                                       Text="Type either one; the other follows."/>
 
-                            <TextBlock Text="NOTES" Style="{StaticResource Label}"/>
-                            <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}"
-                                     AcceptsReturn="True" Height="52" TextWrapping="Wrap"/>
+                            <!-- Sits between the two ways in, centred, so the either/or reads
+                                 off the layout instead of needing a sentence to explain it. -->
+                            <TextBlock Text="or" HorizontalAlignment="Center" Margin="0,9,0,0"
+                                       Foreground="{StaticResource Overlay0}" FontSize="11"/>
 
-                            <Border Background="{StaticResource Surface0}" CornerRadius="6"
-                                    Padding="12,9" Margin="0,14,0,0">
-                                <StackPanel>
-                                    <TextBlock Foreground="{StaticResource Subtext}" FontSize="12"
-                                               Text="{Binding In360, StringFormat={}{0:F2} in/360}"/>
-                                    <TextBlock Foreground="{StaticResource Overlay0}" FontSize="11" Margin="0,3,0,0"
-                                               Text="{Binding Edpi, StringFormat=eDPI {0:F0}}"/>
-                                </StackPanel>
-                            </Border>
+                            <TextBlock Text="Cm/360" Style="{StaticResource Label}" Margin="0,4,0,3"/>
+                            <TextBox x:Name="CmBox" TextChanged="CmBox_TextChanged"/>
 
-                            <Button Content="Save profile" Click="AddProfile_Click" Margin="0,14,0,0"/>
+                            <Button Content="Save" Click="AddProfile_Click" Margin="0,18,0,0"/>
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
@@ -81,24 +98,25 @@
                             <TextBlock Foreground="{StaticResource Subtext}" TextWrapping="Wrap" FontSize="11"
                                        Text="Match a saved profile's cm/360 in another game."/>
 
-                            <TextBlock Text="FROM PROFILE" Style="{StaticResource Label}"/>
+                            <TextBlock Text="From Profile" Style="{StaticResource Label}"/>
                             <ComboBox x:Name="FromBox" DisplayMemberPath="Name"
                                       IsSynchronizedWithCurrentItem="False"
+                                      MaxDropDownHeight="380"
                                       SelectionChanged="Convert_Changed"/>
 
-                            <TextBlock Text="TO GAME" Style="{StaticResource Label}"/>
+                            <TextBlock Text="To Game" Style="{StaticResource Label}"/>
                             <ComboBox x:Name="ToBox" IsSynchronizedWithCurrentItem="False"
                                       IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
                                       MaxDropDownHeight="380"
                                       SelectionChanged="Convert_Changed"/>
 
-                            <TextBlock Text="TARGET DPI" Style="{StaticResource Label}"/>
+                            <TextBlock Text="Target DPI" Style="{StaticResource Label}"/>
                             <TextBox x:Name="ToDpi" Text="800" TextChanged="Convert_Changed"/>
 
                             <Border Background="{StaticResource Surface0}" CornerRadius="6"
                                     Padding="12,10" Margin="0,16,0,0">
                                 <StackPanel>
-                                    <TextBlock Text="SET IN-GAME SENS TO" Style="{StaticResource Label}" Margin="0,0,0,4"/>
+                                    <TextBlock Text="Set Sensitivity To" Style="{StaticResource Label}" Margin="0,0,0,4"/>
                                     <TextBlock x:Name="ConvResult" Foreground="{StaticResource Text}"
                                                FontSize="26" FontWeight="Bold" Text="--"/>
                                     <TextBlock x:Name="ConvDetail" Foreground="{StaticResource Subtext}"
@@ -106,57 +124,7 @@
                                 </StackPanel>
                             </Border>
 
-                            <Button Content="Save as profile" Click="SaveConverted_Click" Margin="0,14,0,0"/>
-                        </StackPanel>
-                    </ScrollViewer>
-                </TabItem>
-
-                <!-- game library -->
-                <TabItem Header="Games">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                        <StackPanel>
-                            <TextBlock Foreground="{StaticResource Subtext}" TextWrapping="Wrap" FontSize="11"
-                                       Text="Game missing? Enter a known cm/360 at any sens/DPI and the yaw constant is derived for you."/>
-
-                            <TextBlock Text="GAME NAME" Style="{StaticResource Label}"/>
-                            <TextBox x:Name="NgName"/>
-
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="10"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Text="AT SENS" Style="{StaticResource Label}"/>
-                                    <TextBox x:Name="NgSens" Text="1"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Text="AT DPI" Style="{StaticResource Label}"/>
-                                    <TextBox x:Name="NgDpi" Text="800"/>
-                                </StackPanel>
-                            </Grid>
-
-                            <TextBlock Text="KNOWN CM/360" Style="{StaticResource Label}"/>
-                            <TextBox x:Name="NgCm"/>
-
-                            <Button Content="Add game" Click="AddGame_Click" Margin="0,14,0,0"/>
-
-                            <TextBlock Text="LIBRARY" Style="{StaticResource Label}" Margin="0,20,0,3"/>
-                            <ListBox x:Name="GameList" Height="180" IsSynchronizedWithCurrentItem="False"
-                                     Background="{StaticResource Surface0}"
-                                     BorderBrush="{StaticResource Surface1}" Foreground="{StaticResource Text}">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{Binding Name}" Width="180" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="{Binding Yaw}" Foreground="{StaticResource Overlay0}" FontSize="11"/>
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                            <Button Content="Remove selected custom game" Style="{StaticResource Ghost}"
-                                    Click="RemoveGame_Click" Margin="0,8,0,0"/>
+                            <Button Content="Save" Click="SaveConverted_Click" Margin="0,14,0,0"/>
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
@@ -175,22 +143,28 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="200"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <ComboBox Grid.Column="0" x:Name="FilterBox" IsSynchronizedWithCurrentItem="False"
                           MaxDropDownHeight="380" SelectionChanged="Filter_Changed"/>
                 <TextBox Grid.Column="1" x:Name="Search" Margin="8,0,0,0"
                          TextChanged="Search_TextChanged"
-                         ToolTip="Filter by name, game or notes"/>
-                <Button Grid.Column="2" Content="Delete" Style="{StaticResource Ghost}"
-                        Click="Delete_Click" Margin="8,0,0,0"/>
+                         ToolTip="Filter by name or game"/>
             </Grid>
 
+            <!-- MinWidth per column is the resize floor: enough for the header plus a few
+                 characters, so a column can never be dragged down to nothing. Past that
+                 the grid scrolls horizontally rather than crushing the columns.
+
+                 Only the two text columns are star-sized. If the fixed ones were stars too
+                 they would fall under their MinWidth on a narrow window and clamp back up.
+                 WPF does not reclaim that space from the wide columns, so the total
+                 overflows and a horizontal scrollbar appears well above the size floor. -->
             <DataGrid Grid.Row="1" x:Name="Grid_"
                       AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                       HeadersVisibility="Column" GridLinesVisibility="Horizontal"
                       Background="{StaticResource Base}" BorderThickness="0"
                       HorizontalGridLinesBrush="{StaticResource Surface0}"
+                      HorizontalScrollBarVisibility="Auto"
                       RowHeight="34" SelectionMode="Extended"
                       AllowDrop="True"
                       PreviewMouseLeftButtonDown="Grid_PreviewMouseLeftButtonDown"
@@ -198,10 +172,48 @@
                       Drop="Grid_Drop"
                       PreviewKeyDown="Grid_PreviewKeyDown">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="NAME" Binding="{Binding Name}" Width="1.4*"/>
-                    <DataGridTextColumn Header="GAME" Binding="{Binding Game}" Width="1.5*"/>
+                    <DataGridTextColumn Header="NAME" Binding="{Binding Name}"
+                                        Width="*" MinWidth="110"
+                                        ElementStyle="{StaticResource Trimmed}"
+                                        EditingElementStyle="{StaticResource CellEditor}"/>
+                    <!-- A template column rather than a text one: a game is not free text,
+                         it carries the yaw constant every number in the row depends on. -->
+                    <DataGridTemplateColumn Header="GAME" Width="*" MinWidth="110"
+                                            SortMemberPath="Game">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Game}" TextTrimming="CharacterEllipsis"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                        <DataGridTemplateColumn.CellEditingTemplate>
+                            <DataTemplate>
+                                <ComboBox Style="{StaticResource CellCombo}"
+                                          ItemsSource="{Binding Games,
+                                                       RelativeSource={RelativeSource AncestorType=Window}}"
+                                          IsEditable="True" IsTextSearchEnabled="True"
+                                          StaysOpenOnEdit="True" MaxDropDownHeight="380"
+                                          IsSynchronizedWithCurrentItem="False"
+                                          Loaded="GameCell_Loaded"
+                                          SelectionChanged="GameCell_SelectionChanged"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellEditingTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn x:Name="SensColumn" Header="SENS"
+                                        Binding="{Binding Sens, StringFormat={}{0:G6}}"
+                                        Width="92" MinWidth="76"
+                                        EditingElementStyle="{StaticResource CellEditor}">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Cursor" Value="Hand"/>
+                                <Setter Property="ToolTip" Value="Click to copy"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Header="DPI" Binding="{Binding Dpi}"
+                                        Width="80" MinWidth="64"
+                                        EditingElementStyle="{StaticResource CellEditor}"/>
                     <DataGridTextColumn Header="CM/360" Binding="{Binding Cm360, StringFormat={}{0:F1}}"
-                                        IsReadOnly="True" Width="0.7*">
+                                        IsReadOnly="True" Width="96" MinWidth="82">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
                                 <Setter Property="Foreground" Value="#FFFFFF"/>
@@ -209,17 +221,28 @@
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
-                    <DataGridTextColumn Header="IN/360" Binding="{Binding In360, StringFormat={}{0:F2}}"
-                                        IsReadOnly="True" Width="0.7*"/>
-                    <DataGridTextColumn Header="DPI" Binding="{Binding Dpi}" Width="0.6*"/>
-                    <DataGridTextColumn Header="SENS" Binding="{Binding Sens, StringFormat={}{0:G6}}" Width="0.7*"/>
-                    <DataGridTextColumn Header="EDPI" Binding="{Binding Edpi, StringFormat={}{0:F0}}"
-                                        IsReadOnly="True" Width="0.6*"/>
-                    <DataGridTextColumn Header="NOTES" Binding="{Binding Notes}" Width="1.2*"/>
-                    <DataGridTextColumn Header="ADDED" Binding="{Binding Added, StringFormat={}{0:yyyy-MM-dd}}"
-                                        IsReadOnly="True" Width="0.8*"/>
+                    <DataGridTextColumn Header="ADDED" Binding="{Binding Added, StringFormat={}{0:MMM d yyyy}}"
+                                        IsReadOnly="True" Width="108" MinWidth="96">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{StaticResource Overlay0}"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
                 </DataGrid.Columns>
             </DataGrid>
+
+            <Border Grid.Row="1" x:Name="Toast" Opacity="0" IsHitTestVisible="False"
+                    HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,20"
+                    Background="{StaticResource Surface1}" CornerRadius="16" Padding="16,8">
+                <Border.RenderTransform>
+                    <TranslateTransform x:Name="ToastShift" Y="10"/>
+                </Border.RenderTransform>
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="14" ShadowDepth="3" Opacity="0.55" Color="#000000"/>
+                </Border.Effect>
+                <TextBlock x:Name="ToastText" Foreground="{StaticResource Text}" FontSize="12"/>
+            </Border>
 
             <TextBlock Grid.Row="2" x:Name="Status" Foreground="{StaticResource Overlay0}"
                        FontSize="11" Margin="2,10,0,0"/>

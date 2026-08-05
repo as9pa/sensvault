@@ -46,6 +46,27 @@
             </Setter>
         </Style>
 
+        <!-- A DataGridTextColumn hands its editor DefaultEditingElementStyle, which outranks
+             the implicit TextBox style above and leaves a white box on the dark grid. Every
+             editable column has to point at this explicitly. -->
+        <Style x:Key="CellEditor" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Background" Value="{StaticResource Surface1}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Overlay0}"/>
+            <!-- A 34px row leaves the editor very little once the cell's own padding is
+                 taken out. Any margin here, plus generous padding, squeezes the content
+                 host below one line height and clips the glyphs through the middle.
+
+                 The negative margin claims back most of the cell's editing padding so the
+                 box is not cramped, and Padding then puts the text back where it rests.
+                 Padding counts twice here: TextBoxBase copies it onto the content host
+                 that the template already margins by Padding. So the resting 8px is
+                 (5 cell - 2 margin) + 1 border + 2x1 padding + WPF's 2px caret gutter. -->
+            <Setter Property="MinHeight" Value="28"/>
+            <Setter Property="Margin" Value="-2,0,-2,0"/>
+            <Setter Property="Padding" Value="1,2"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
         <!-- scrollbar: default WPF chrome is light and looks wrong on dark -->
         <Style TargetType="ScrollBar">
             <Setter Property="Background" Value="Transparent"/>
@@ -94,43 +115,69 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBox">
+                        <!-- Two columns on purpose. The editable text box lives in column 0
+                             only, so it cannot swallow clicks meant for the arrow; the
+                             toggle spans both and picks up whatever the text box misses. -->
                         <Grid>
-                            <Border x:Name="Bd"
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="26"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border x:Name="Bd" Grid.ColumnSpan="2"
                                     Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}"
                                     CornerRadius="4"/>
-                            <ToggleButton Focusable="False" ClickMode="Press" Background="Transparent"
+                            <ToggleButton Grid.ColumnSpan="2"
+                                          Focusable="False" ClickMode="Press" Background="Transparent"
                                           IsChecked="{Binding IsDropDownOpen, Mode=TwoWay,
                                                       RelativeSource={RelativeSource TemplatedParent}}">
                                 <ToggleButton.Template>
                                     <ControlTemplate TargetType="ToggleButton">
                                         <Border Background="Transparent">
-                                            <Path HorizontalAlignment="Right" VerticalAlignment="Center"
+                                            <Path x:Name="Arrow"
+                                                  HorizontalAlignment="Right" VerticalAlignment="Center"
                                                   Margin="0,0,10,0" Data="M0,0 L7,0 L3.5,4.5 Z"
                                                   Fill="{StaticResource Overlay0}"/>
                                         </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Arrow" Property="Fill"
+                                                        Value="{StaticResource Text}"/>
+                                            </Trigger>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="Arrow" Property="Fill"
+                                                        Value="{StaticResource Text}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
                                     </ControlTemplate>
                                 </ToggleButton.Template>
                             </ToggleButton>
-                            <ContentPresenter x:Name="ContentSite" IsHitTestVisible="False"
+                            <ContentPresenter x:Name="ContentSite" Grid.Column="0" IsHitTestVisible="False"
                                               Content="{TemplateBinding SelectionBoxItem}"
                                               ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                                               Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                            <TextBox x:Name="PART_EditableTextBox" Visibility="Hidden"
+                            <TextBox x:Name="PART_EditableTextBox" Grid.Column="0" Visibility="Hidden"
                                      Background="Transparent" BorderThickness="0" Padding="0"
                                      Foreground="{StaticResource Text}"
                                      Margin="{TemplateBinding Padding}" VerticalAlignment="Center"
                                      IsReadOnly="{TemplateBinding IsReadOnly}"/>
-                            <Popup x:Name="PART_Popup" AllowsTransparency="True" Focusable="False"
-                                   IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom">
+                            <Popup x:Name="PART_Popup" Grid.ColumnSpan="2"
+                                   AllowsTransparency="True" Focusable="False"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom"
+                                   PopupAnimation="None">
                                 <Border Background="{StaticResource Surface0}"
                                         BorderBrush="{StaticResource Surface1}"
-                                        BorderThickness="1" CornerRadius="4" Margin="0,2,0,0"
+                                        BorderThickness="1" CornerRadius="4" Margin="0,2,0,6"
                                         MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
                                         MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                    <ScrollViewer>
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="10" ShadowDepth="2"
+                                                          Opacity="0.5" Color="#000000"/>
+                                    </Border.Effect>
+                                    <ScrollViewer Margin="0,3">
                                         <ItemsPresenter/>
                                     </ScrollViewer>
                                 </Border>
@@ -144,10 +191,24 @@
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Overlay0}"/>
                             </Trigger>
+                            <Trigger Property="IsDropDownOpen" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Overlay0}"/>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <!-- Same size and alignment goal as CellEditor. The combo's inner text box has no
+             padding of its own, so here Padding counts once rather than twice: the text
+             lands on (5 cell - 2 margin) + 3 padding + 2. -->
+        <Style x:Key="CellCombo" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+            <Setter Property="Background" Value="{StaticResource Surface1}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Overlay0}"/>
+            <Setter Property="MinHeight" Value="28"/>
+            <Setter Property="Margin" Value="-2,0,-2,0"/>
+            <Setter Property="Padding" Value="3,2"/>
         </Style>
 
         <Style TargetType="ComboBoxItem">
@@ -161,6 +222,9 @@
                             <ContentPresenter/>
                         </Border>
                         <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="b" Property="Background" Value="{StaticResource Surface1}"/>
+                            </Trigger>
                             <Trigger Property="IsHighlighted" Value="True">
                                 <Setter TargetName="b" Property="Background" Value="{StaticResource Surface1}"/>
                             </Trigger>
@@ -282,6 +346,13 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+            <Style.Triggers>
+                <!-- Reading padding is too tight to hold an input box. Hand the editor most
+                     of the row back; the text column keeps its resting inset. -->
+                <Trigger Property="IsEditing" Value="True">
+                    <Setter Property="Padding" Value="5,2"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
     </Application.Resources>

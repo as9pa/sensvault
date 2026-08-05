@@ -8,6 +8,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 
 namespace SensVault;
 
@@ -40,6 +41,9 @@ public partial class MainWindow : Window
     private Point _dragStart;
     private SensProfile? _dragItem;
 
+    /// <summary>Bound to by the in-cell game picker, which cannot reach a private field.</summary>
+    public ObservableCollection<Game> Games => _games;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -60,8 +64,15 @@ public partial class MainWindow : Window
         foreach (var p in _profiles)
             p.PropertyChanged += OnProfileEdited;
 
-        Grid_.BeginningEdit += (_, _) => _editing = true;
+        DpiBox.Text =
+            _data.LastDpi > 0 ? _data.LastDpi.ToString("G6", CultureInfo.CurrentCulture) : "800";
+
+        Grid_.BeginningEdit += Grid_BeginningEdit;
         Grid_.CellEditEnding += (_, _) => _editing = false;
+        Grid_.RowEditEnding += (_, _) => _editing = false;
+
+        // The non-client area is drawn by the OS, not WPF, so it stays light unless asked.
+        SourceInitialized += (_, _) => TitleBar.MakeDark(this);
         Closing += (_, _) => Save();
 
         _ready = true;
@@ -88,7 +99,6 @@ public partial class MainWindow : Window
         {
             GameBox.ItemsSource = _games;
             ToBox.ItemsSource = _games;
-            GameList.ItemsSource = _games;
         }
 
         Reselect(GameBox, prevAdd);
@@ -122,59 +132,37 @@ public partial class MainWindow : Window
         Resync();
     }
 
-    private void AddGame_Click(object sender, RoutedEventArgs e)
+    // ---------- in-cell game picker ----------
+
+    private void GameCell_Loaded(object sender, RoutedEventArgs e)
     {
-        var name = NgName.Text.Trim();
-        if (name.Length == 0)
-        {
-            Warn("Give the game a name.");
-            return;
-        }
+        var box = (ComboBox)sender;
+        if (box.DataContext is SensProfile p)
+            box.SelectedItem = _games.FirstOrDefault(g =>
+                g.Name.Equals(p.Game, StringComparison.OrdinalIgnoreCase)
+            );
 
-        if (
-            !TryNum(NgSens.Text, out var sens)
-            || !TryNum(NgDpi.Text, out var dpi)
-            || !TryNum(NgCm.Text, out var cm)
-        )
-        {
-            Warn("Sens, DPI and cm/360 all need to be positive numbers.");
-            return;
-        }
-
-        var yaw = SensMath.YawFromCm360(cm, sens, dpi);
-        if (yaw <= 0)
-        {
-            Warn("Those values don't give a usable yaw constant.");
-            return;
-        }
-
-        _data.CustomGames.RemoveAll(g => g.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-        _data.CustomGames.Add(new Game { Name = name, Yaw = yaw });
-        RebuildGames();
-        Save();
-
-        NgName.Clear();
-        NgCm.Clear();
-        SetStatus($"Added {name} · yaw {yaw:G6}");
+        // Deferred: the box is still being wired up during Loaded, and opening the drop-down
+        // from inside that pass leaves it unpopulated.
+        box.Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Input,
+            new Action(() =>
+            {
+                box.Focus();
+                box.IsDropDownOpen = true;
+            })
+        );
     }
 
-    private void RemoveGame_Click(object sender, RoutedEventArgs e)
+    private void GameCell_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (GameList.SelectedItem is not Game g)
-        {
-            Warn("Select a game in the list first.");
+        // Only a real pick counts. Typing text that matches nothing leaves SelectedItem null,
+        // and writing that through would strip the row of the yaw its numbers depend on.
+        if (sender is not ComboBox { SelectedItem: Game g, DataContext: SensProfile p })
             return;
-        }
-        if (g.BuiltIn)
-        {
-            Warn($"{g.Name} is built in and can't be removed.");
-            return;
-        }
 
-        _data.CustomGames.RemoveAll(x => x.Name.Equals(g.Name, StringComparison.OrdinalIgnoreCase));
-        RebuildGames();
-        Save();
-        SetStatus($"Removed {g.Name}.");
+        p.Game = g.Name;
+        p.Yaw = g.Yaw;
     }
 
     // ---------- linked sens / cm-360 entry ----------
@@ -254,18 +242,18 @@ public partial class MainWindow : Window
             return;
         }
 
+        // A blank name is allowed; the game and numbers already identify the row.
         var p = _draft.Clone();
-        if (string.IsNullOrWhiteSpace(p.Name))
-            p.Name = p.Game;
         p.Order = _profiles.Count;
 
         _profiles.Add(p);
         _draft.Name = "";
-        _draft.Notes = "";
-        SetStatus($"Saved \"{p.Name}\" at {p.Cm360:F1} cm/360.");
+
+        var label = string.IsNullOrWhiteSpace(p.Name) ? p.Game : $"\"{p.Name}\"";
+        SetStatus($"Saved {label} at {p.Cm360:F1} cm/360.");
     }
 
-    private void Delete_Click(object sender, RoutedEventArgs e)
+    private void DeleteSelected()
     {
         var doomed = Grid_.SelectedItems.OfType<SensProfile>().ToList();
         if (doomed.Count == 0)
@@ -282,10 +270,87 @@ public partial class MainWindow : Window
 
     private void Grid_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Delete || _editing)
+        if (e.Key != Key.Delete)
             return;
-        Delete_Click(sender, e);
+
+        // Inside an open cell editor Delete means "remove a character", not "remove the row".
+        // Asking the focused cell directly beats trusting a flag that can desync.
+        if (FindParent<DataGridCell>(Keyboard.FocusedElement)?.IsEditing == true)
+            return;
+
+        DeleteSelected();
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// Clicking anywhere that is not a profile row drops the selection, so the vault never
+    /// keeps a row highlighted that you have moved on from. Tunnels from the window, so it
+    /// covers the blank area under the last row as well as the whole left-hand panel.
+    /// </summary>
+    // PreviewMouseDown, not PreviewMouseLeftButtonDown: the latter is a Direct event that
+    // WPF re-raises on each element as this one tunnels past. Only this one truly tunnels.
+    private void Window_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton == MouseButton.Left)
+            ClearSelectionUnlessRow(e.OriginalSource);
+    }
+
+    private void ClearSelectionUnlessRow(object? origin)
+    {
+        if (FindParent<DataGridRow>(origin) is not null)
+            return;
+
+        // Scrolling is navigation, not a change of mind about what is selected.
+        if (FindParent<ScrollBar>(origin) is not null)
+            return;
+
+        if (Grid_.SelectedItems.Count == 0)
+            return;
+
+        // An open editor has to be put away first, and a rejected commit means the click
+        // should not take the row out from under a half-finished edit.
+        if (!Grid_.CommitEdit(DataGridEditingUnit.Row, exitEditingMode: true))
+            return;
+
+        Grid_.UnselectAll();
+        Grid_.CurrentCell = default;
+    }
+
+    /// <summary>
+    /// Out of the box a second single click on the current cell opens its editor, which
+    /// would fight click-to-copy and make drag-reordering trip into edit mode. Only a
+    /// double click (or F2, which arrives with no mouse args) may edit.
+    /// </summary>
+    private void Grid_BeginningEdit(object? sender, DataGridBeginningEditEventArgs e)
+    {
+        if (e.EditingEventArgs is MouseButtonEventArgs { ClickCount: < 2 })
+        {
+            e.Cancel = true;
+            return;
+        }
+        _editing = true;
+    }
+
+    // ---------- click a sens to copy it ----------
+
+    private void CopySens(SensProfile p)
+    {
+        // Matches the column's own formatting, so what lands on the clipboard is what the
+        // row shows rather than a full-precision double.
+        var text = p.Sens.ToString("G6", CultureInfo.CurrentCulture);
+        try
+        {
+            Clipboard.SetDataObject(text, copy: true);
+        }
+        catch (Exception ex)
+        {
+            // Another process can hold the clipboard open; nothing to do but say so.
+            Warn("Could not copy: " + ex.Message);
+            return;
+        }
+
+        ToastText.Text = $"Copied  {text}";
+        ((Storyboard)FindResource("ToastPop")).Begin(this, isControllable: true);
     }
 
     // ---------- drag to reorder ----------
@@ -294,6 +359,13 @@ public partial class MainWindow : Window
     {
         _dragStart = e.GetPosition(null);
         _dragItem = FindParent<DataGridRow>(e.OriginalSource)?.Item as SensProfile;
+
+        if (
+            e.ClickCount == 1
+            && _dragItem is not null
+            && FindParent<DataGridCell>(e.OriginalSource)?.Column == SensColumn
+        )
+            CopySens(_dragItem);
     }
 
     private void Grid_MouseMove(object sender, MouseEventArgs e)
@@ -458,7 +530,7 @@ public partial class MainWindow : Window
         if (string.IsNullOrEmpty(q))
             return true;
 
-        return Has(p.Name, q) || Has(p.Game, q) || Has(p.Notes, q);
+        return Has(p.Name, q) || Has(p.Game, q);
     }
 
     private static bool Has(string? s, string q) =>
@@ -494,6 +566,8 @@ public partial class MainWindow : Window
         if (!_ready)
             return;
         _data.Profiles = [.. _profiles];
+        if (_draft.Dpi > 0)
+            _data.LastDpi = _draft.Dpi;
         try
         {
             Store.Save(_data);

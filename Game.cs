@@ -71,8 +71,8 @@ public static class GameLibrary
     //   PUBG                 -- non-linear, 10^(sens/50), and FOV-scaled
     //   Battlefield 1/V/6    -- affine, sens*k + offset rather than proportional
     //   GTA 5                -- affine, same reason
-    // Add any of these yourself via the Games tab if you pin down a cm/360 for the
-    // exact FOV you play at; the back-solve will fit a constant to that one point.
+    // SensMath.YawFromCm360 can still fit a constant to a single known cm/360 at one FOV
+    // if a custom-game entry point comes back; there is no UI for it right now.
 
     private static Game G(string name, double yaw) =>
         new()
