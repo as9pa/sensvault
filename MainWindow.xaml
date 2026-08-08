@@ -83,7 +83,8 @@
 
                 <!-- add a profile -->
                 <TabItem Header="Create">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                    <ScrollViewer x:Name="CreateScroll" VerticalScrollBarVisibility="Auto"
+                                  Margin="0,10,0,0">
                         <StackPanel x:Name="DraftPanel">
                             <TextBlock Text="Name" Style="{StaticResource Label}"/>
                             <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"/>
@@ -146,7 +147,8 @@
 
                 <!-- convert between games -->
                 <TabItem Header="Convert">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                    <ScrollViewer x:Name="ConvertScroll" VerticalScrollBarVisibility="Auto"
+                                  Margin="0,10,0,0">
                         <StackPanel>
                             <TextBlock Foreground="{StaticResource Subtext}" TextWrapping="Wrap" FontSize="11"
                                        Text="Convert a sensitivity to another game."/>
@@ -207,6 +209,7 @@
                     <ListBox x:Name="SettingsNav" Margin="0,10,0,0" SelectedIndex="0"
                              Background="Transparent" BorderThickness="0"
                              SelectionChanged="SettingsNav_SelectionChanged">
+                        <ListBoxItem Content="General"/>
                         <ListBoxItem Content="Themes"/>
                     </ListBox>
                 </TabItem>
@@ -482,11 +485,20 @@
 
             <Grid x:Name="SettingsView" Grid.Row="0" Visibility="Collapsed">
                 <StackPanel>
-                    <TextBlock x:Name="SettingsTitle" Text="Themes" FontSize="17"
+                    <TextBlock x:Name="SettingsTitle" Text="General" FontSize="17"
                                FontWeight="SemiBold" Foreground="{StaticResource Text}"/>
                     <TextBlock x:Name="SettingsBlurb" Text="Nothing here yet."
                                FontSize="12" Foreground="{StaticResource Overlay0}"
                                Margin="0,8,0,0" TextWrapping="Wrap"/>
+
+                    <StackPanel x:Name="GeneralSettings" Visibility="Collapsed" Margin="0,14,0,0">
+                        <CheckBox x:Name="NoScrollBars" Content="Disable scrollbars"
+                                  Click="NoScrollBars_Click"/>
+                        <TextBlock Text="Hides the scrollbars in the vault and the entry panel. The wheel still scrolls; only the bars go away."
+                                   FontSize="12" Foreground="{StaticResource Overlay0}"
+                                   Margin="24,4,0,0" TextWrapping="Wrap" MaxWidth="420"
+                                   HorizontalAlignment="Left"/>
+                    </StackPanel>
                 </StackPanel>
             </Grid>
 

@@ -45,6 +45,7 @@ public partial class MainWindow : Window
 
     private bool _ready;
     private bool _editing;
+    private bool _renaming; // set only while the menu's Rename opens an editor deliberately
     private bool _syncing; // set while writing a linked box, so its TextChanged is ignored
     private bool _drivenByCm; // true when cm/360 was the field the user last typed into
 
@@ -106,6 +107,10 @@ public partial class MainWindow : Window
         ApplyZoom(_data.VaultZoom);
         ShowLeftPanel(!_data.PanelCollapsed);
         ShowFilterBar(!_data.BarCollapsed);
+
+        NoScrollBars.IsChecked = _data.HideScrollBars;
+        ApplyScrollBars();
+        ShowSettingsPage();
 
         Grid_.BeginningEdit += Grid_BeginningEdit;
         Grid_.CellEditEnding += (_, _) => _editing = false;
@@ -318,7 +323,19 @@ public partial class MainWindow : Window
         p.Order = _profiles.Count;
 
         _profiles.Add(p);
+
+        // Clear what belongs to the one sensitivity just saved -- its name and its two number
+        // boxes -- and keep what belongs to the session. The DPI is the mouse's and does not
+        // change between entries, and the game is usually the same for a run of them, so
+        // asking for both again every time is just retyping.
         _draft.Name = "";
+        SetText(SensBox, "");
+        SetText(CmBox, "");
+        _draft.Sens = 0;
+
+        // Neither box was the one typed into any more; without this the next keystroke in
+        // one of them would be treated as a correction to whichever led last time.
+        _drivenByCm = false;
 
         var label = string.IsNullOrWhiteSpace(p.Name) ? p.Game : $"\"{p.Name}\"";
         SetStatus($"Saved {label} at {p.Cm360:F1} cm/360.");
@@ -402,12 +419,27 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// Out of the box a second single click on the current cell opens its editor, which
-    /// would fight click-to-copy and make drag-reordering trip into edit mode. Only a
-    /// double click (or F2, which arrives with no mouse args) may edit.
+    /// would fight click-to-copy and make drag-reordering trip into edit mode. Only a double
+    /// click, F2, or the menu's own Rename may edit.
+    ///
+    /// Stated as what is allowed rather than what is refused, which is the part that was
+    /// wrong: refusing single clicks let everything that was not a click straight through.
+    /// Closing the context menu hands focus back into the grid, the cell that lands on
+    /// raises this with no mouse args behind it, and an editor opened on its own -- so
+    /// picking Delete deleted the row and then dropped the row beneath it into a rename.
     /// </summary>
     private void Grid_BeginningEdit(object? sender, DataGridBeginningEditEventArgs e)
     {
-        if (e.EditingEventArgs is MouseButtonEventArgs { ClickCount: < 2 })
+        var wanted = e.EditingEventArgs switch
+        {
+            MouseButtonEventArgs m => m.ClickCount >= 2,
+            KeyEventArgs k => k.Key is Key.F2,
+            // Everything else -- focus changes, the grid's own housekeeping -- is only ever
+            // an edit if this app asked for one.
+            _ => _renaming,
+        };
+
+        if (!wanted)
         {
             e.Cancel = true;
             return;
@@ -474,7 +506,15 @@ public partial class MainWindow : Window
             new Action(() =>
             {
                 Grid_.Focus();
-                Grid_.BeginEdit();
+                _renaming = true;
+                try
+                {
+                    Grid_.BeginEdit();
+                }
+                finally
+                {
+                    _renaming = false;
+                }
             })
         );
     }
@@ -1022,14 +1062,54 @@ public partial class MainWindow : Window
         SettingsView.Visibility = settings ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private void SettingsNav_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void SettingsNav_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        ShowSettingsPage();
+
+    /// <summary>
+    /// Called from the constructor as well as on every pick. The list's SelectedIndex="0"
+    /// raises its SelectionChanged while the tab is still being parsed, when the panes it
+    /// wants to show do not exist yet -- so the opening page has to be settled once more
+    /// after the window is built, or General comes up reading "nothing here yet".
+    /// </summary>
+    private void ShowSettingsPage()
     {
-        if (SettingsTitle is null || SettingsBlurb is null)
+        if (SettingsTitle is null || SettingsBlurb is null || GeneralSettings is null)
             return;
 
-        SettingsTitle.Text =
-            (SettingsNav.SelectedItem as ListBoxItem)?.Content as string ?? "Themes";
-        SettingsBlurb.Text = "Nothing here yet.";
+        var page = (SettingsNav.SelectedItem as ListBoxItem)?.Content as string ?? "General";
+        SettingsTitle.Text = page;
+
+        var general = page == "General";
+        GeneralSettings.Visibility = general ? Visibility.Visible : Visibility.Collapsed;
+
+        // The blurb is the placeholder for a page with no controls yet; a page that has some
+        // does not need to be told it is empty.
+        SettingsBlurb.Visibility = general ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    // ---------- general settings ----------
+
+    private void NoScrollBars_Click(object sender, RoutedEventArgs e)
+    {
+        ApplyScrollBars();
+        Save();
+    }
+
+    /// <summary>
+    /// Hidden rather than Disabled: Disabled tells the panel it has no room to scroll into,
+    /// so the content is measured against the viewport and simply gets cut off. Hidden keeps
+    /// the scrolling -- wheel, keyboard, ScrollIntoView all still work -- and only stops the
+    /// bar being drawn, which is the part that was in the way.
+    /// </summary>
+    private void ApplyScrollBars()
+    {
+        var bars =
+            NoScrollBars.IsChecked == true ? ScrollBarVisibility.Hidden : ScrollBarVisibility.Auto;
+
+        Grid_.VerticalScrollBarVisibility = bars;
+        Grid_.HorizontalScrollBarVisibility = bars;
+        CreateScroll.VerticalScrollBarVisibility = bars;
+        ConvertScroll.VerticalScrollBarVisibility = bars;
     }
 
     // ---------- zoom ----------
@@ -1259,6 +1339,7 @@ public partial class MainWindow : Window
         _data.VaultZoom = Zoom.ScaleX;
         _data.PanelCollapsed = LeftPanel.Visibility != Visibility.Visible;
         _data.BarCollapsed = FilterBar.Visibility != Visibility.Visible;
+        _data.HideScrollBars = NoScrollBars.IsChecked == true;
         CaptureColumnWidths();
         if (_draft.Dpi > 0)
             _data.LastDpi = _draft.Dpi;

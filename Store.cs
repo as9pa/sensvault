@@ -37,6 +37,10 @@ public class AppData
 
     /// <summary>Game the vault was filtered to at close. Empty means all games.</summary>
     public string LastFilter { get; set; } = "";
+
+    /// <summary>Whether the scrollbars are hidden throughout. The wheel still scrolls -- this
+    /// takes away the bars, not the scrolling.</summary>
+    public bool HideScrollBars { get; set; }
 }
 
 /// <summary>
