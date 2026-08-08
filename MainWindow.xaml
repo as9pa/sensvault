@@ -6,28 +6,39 @@
         xmlns:local="clr-namespace:SensVault"
         mc:Ignorable="d"
         Title="SensVault" Height="640" Width="1180"
-        MinWidth="990" MinHeight="420"
+        MinWidth="330" MinHeight="240"
         Background="{StaticResource Base}"
         TextOptions.TextFormattingMode="Display"
         FontFamily="Segoe UI" FontSize="13"
-        PreviewMouseDown="Window_PreviewMouseDown">
+        PreviewMouseDown="Window_PreviewMouseDown"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        PreviewMouseWheel="Window_PreviewMouseWheel">
 
     <Window.Resources>
         <!-- Rise-and-fade toast. One storyboard, restarted on each copy, so rapid clicks
-             re-arm the timer instead of stacking up. -->
+             re-arm the timer instead of stacking up.
+
+             Everything on the way in is eased. A linear fade reaches full opacity at a
+             constant rate and reads as a pop; the ease-out front-loads the motion and
+             then settles, which is what makes it feel like it arrived rather than
+             appeared. The rise runs longer than the fade so the two do not stop together. -->
         <Storyboard x:Key="ToastPop">
             <DoubleAnimation Storyboard.TargetName="Toast" Storyboard.TargetProperty="Opacity"
-                             To="1" Duration="0:0:0.14"/>
+                             To="1" Duration="0:0:0.22">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
             <DoubleAnimation Storyboard.TargetName="ToastShift" Storyboard.TargetProperty="Y"
-                             From="10" To="0" Duration="0:0:0.24">
+                             From="12" To="0" Duration="0:0:0.32">
                 <DoubleAnimation.EasingFunction>
                     <CubicEase EasingMode="EaseOut"/>
                 </DoubleAnimation.EasingFunction>
             </DoubleAnimation>
             <DoubleAnimation Storyboard.TargetName="Toast" Storyboard.TargetProperty="Opacity"
-                             To="0" BeginTime="0:0:1.25" Duration="0:0:0.4"/>
+                             To="0" BeginTime="0:0:1.25" Duration="0:0:0.45"/>
             <DoubleAnimation Storyboard.TargetName="ToastShift" Storyboard.TargetProperty="Y"
-                             To="8" BeginTime="0:0:1.25" Duration="0:0:0.4">
+                             To="8" BeginTime="0:0:1.25" Duration="0:0:0.45">
                 <DoubleAnimation.EasingFunction>
                     <CubicEase EasingMode="EaseIn"/>
                 </DoubleAnimation.EasingFunction>
@@ -37,20 +48,41 @@
         <Style x:Key="Trimmed" TargetType="TextBlock">
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
+
+        <!-- Cells you can click to copy. Both the sens and the cm/360 carry it, so the
+             cursor and tooltip are declared once. -->
+        <Style x:Key="Copyable" TargetType="TextBlock">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="ToolTip" Value="Click to copy"/>
+        </Style>
     </Window.Resources>
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="340"/>
+            <ColumnDefinition x:Name="LeftColumn" Width="340"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
         <!-- left: input panel -->
-        <Border Grid.Column="0" Background="{StaticResource Mantle}" Padding="16,14">
-            <TabControl x:Name="Tabs" Background="Transparent" BorderThickness="0">
+        <Border x:Name="LeftPanel" Grid.Column="0" Background="{StaticResource Mantle}"
+                Padding="16,14">
+            <TabControl x:Name="Tabs" SelectionChanged="Tabs_SelectionChanged">
+                <!-- Rides in Tag so the TabControl template can place it just right of the
+                     settings tab. See the header Grid in the TabControl style. -->
+                <TabControl.Tag>
+                    <Button x:Name="CollapseButton" Style="{StaticResource IconButton}"
+                            Click="ToggleLeftPanel_Click" Padding="7,7" Margin="2,0,0,0"
+                            ToolTip="Collapse this panel">
+                        <Path Data="{StaticResource ChevronsLeft}" StrokeThickness="1.5"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              StrokeLineJoin="Round"
+                              Stroke="{Binding Foreground,
+                                       RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </Button>
+                </TabControl.Tag>
 
                 <!-- add a profile -->
-                <TabItem Header="Profile">
+                <TabItem Header="Create">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
                         <StackPanel x:Name="DraftPanel">
                             <TextBlock Text="Name" Style="{StaticResource Label}"/>
@@ -74,16 +106,37 @@
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
                                     <TextBlock Text="DPI" Style="{StaticResource Label}"/>
-                                    <TextBox x:Name="DpiBox" Text="800" TextChanged="DpiBox_TextChanged"/>
+                                    <TextBox x:Name="DpiBox" TextChanged="DpiBox_TextChanged"/>
                                 </StackPanel>
                             </Grid>
 
                             <!-- Sits between the two ways in, centred, so the either/or reads
-                                 off the layout instead of needing a sentence to explain it. -->
-                            <TextBlock Text="or" HorizontalAlignment="Center" Margin="0,9,0,0"
-                                       Foreground="{StaticResource Overlay0}" FontSize="11"/>
+                                 off the layout instead of needing a sentence to explain it.
+                                 The rules either side are what make it read as a divider
+                                 rather than a stray word.
 
-                            <TextBlock Text="Cm/360" Style="{StaticResource Label}" Margin="0,4,0,3"/>
+                                 Ideal formatting locally: the window runs in Display mode,
+                                 which snaps glyphs to whole pixels. That is right for the
+                                 grid's numbers and brutal on one small dim word. -->
+                            <Grid Margin="0,16,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Height="1" Margin="0,0,10,0"
+                                        VerticalAlignment="Center"
+                                        Background="{StaticResource Surface0}"/>
+                                <TextBlock Grid.Column="1" Text="or" FontSize="12"
+                                           Foreground="{StaticResource Overlay0}"
+                                           TextOptions.TextFormattingMode="Ideal"
+                                           TextOptions.TextRenderingMode="ClearType"/>
+                                <Border Grid.Column="2" Height="1" Margin="10,0,0,0"
+                                        VerticalAlignment="Center"
+                                        Background="{StaticResource Surface0}"/>
+                            </Grid>
+
+                            <TextBlock Text="cm/360" Style="{StaticResource Label}" Margin="0,0,0,3"/>
                             <TextBox x:Name="CmBox" TextChanged="CmBox_TextChanged"/>
 
                             <Button Content="Save" Click="AddProfile_Click" Margin="0,18,0,0"/>
@@ -96,10 +149,10 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
                         <StackPanel>
                             <TextBlock Foreground="{StaticResource Subtext}" TextWrapping="Wrap" FontSize="11"
-                                       Text="Match a saved profile's cm/360 in another game."/>
+                                       Text="Convert a sensitivity to another game."/>
 
                             <TextBlock Text="From Profile" Style="{StaticResource Label}"/>
-                            <ComboBox x:Name="FromBox" DisplayMemberPath="Name"
+                            <ComboBox x:Name="FromBox" DisplayMemberPath="Label"
                                       IsSynchronizedWithCurrentItem="False"
                                       MaxDropDownHeight="380"
                                       SelectionChanged="Convert_Changed"/>
@@ -111,141 +164,335 @@
                                       SelectionChanged="Convert_Changed"/>
 
                             <TextBlock Text="Target DPI" Style="{StaticResource Label}"/>
-                            <TextBox x:Name="ToDpi" Text="800" TextChanged="Convert_Changed"/>
+                            <TextBox x:Name="ToDpi" TextChanged="ToDpi_TextChanged"/>
 
                             <Border Background="{StaticResource Surface0}" CornerRadius="6"
                                     Padding="12,10" Margin="0,16,0,0">
                                 <StackPanel>
-                                    <TextBlock Text="Set Sensitivity To" Style="{StaticResource Label}" Margin="0,0,0,4"/>
-                                    <TextBlock x:Name="ConvResult" Foreground="{StaticResource Text}"
-                                               FontSize="26" FontWeight="Bold" Text="--"/>
+                                    <TextBlock Text="Converted Sensitivity" Style="{StaticResource Label}"
+                                               Margin="0,0,0,4"/>
+                                    <!-- Bottom-aligned rather than centred: the cm/360 is a
+                                         footnote to the number, so it sits on its baseline. -->
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock x:Name="ConvResult" Foreground="{StaticResource Text}"
+                                                   FontSize="26" FontWeight="Bold" Text="--"
+                                                   VerticalAlignment="Bottom"/>
+                                        <TextBlock x:Name="ConvDot" Text="&#183;" FontSize="18"
+                                                   Foreground="{StaticResource Overlay0}"
+                                                   Margin="9,0,9,1" VerticalAlignment="Bottom"
+                                                   Visibility="Collapsed"/>
+                                        <TextBlock x:Name="ConvCm" Foreground="{StaticResource Subtext}"
+                                                   FontSize="13" Margin="0,0,0,3"
+                                                   VerticalAlignment="Bottom"/>
+                                    </StackPanel>
                                     <TextBlock x:Name="ConvDetail" Foreground="{StaticResource Subtext}"
-                                               FontSize="11" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                               FontSize="11" Margin="0,3,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </Border>
 
-                            <Button Content="Save" Click="SaveConverted_Click" Margin="0,14,0,0"/>
+                            <Button Content="Convert" Click="SaveConverted_Click" Margin="0,14,0,0"/>
                         </StackPanel>
                     </ScrollViewer>
+                </TabItem>
+
+                <!-- settings. Docked right by the TabControl's DockPanel items host, so it
+                     lands at the far end of the same strip as the two text tabs. -->
+                <TabItem x:Name="SettingsTab" DockPanel.Dock="Right" ToolTip="Settings">
+                    <TabItem.Header>
+                        <Path Data="{StaticResource GearIcon}" Width="15" Height="15"
+                              Stretch="Uniform"
+                              Fill="{Binding Foreground,
+                                     RelativeSource={RelativeSource AncestorType=TabItem}}"/>
+                    </TabItem.Header>
+                    <ListBox x:Name="SettingsNav" Margin="0,10,0,0" SelectedIndex="0"
+                             Background="Transparent" BorderThickness="0"
+                             SelectionChanged="SettingsNav_SelectionChanged">
+                        <ListBoxItem Content="Themes"/>
+                    </ListBox>
                 </TabItem>
             </TabControl>
         </Border>
 
-        <!-- right: the vault -->
-        <Grid Grid.Column="1" Margin="16,14,16,14">
+        <!-- right: the vault, or the settings detail for whatever the left list has picked -->
+        <Grid x:Name="VaultRoot" Grid.Column="1" Margin="16,14,16,14" UseLayoutRounding="True">
+            <!-- Ctrl +/- zooms this side only; the entry panel keeps its size so the two
+                 never fight for the window's width.
+
+                 LayoutTransform, not RenderTransform: it re-measures at the scaled size, so
+                 the grid reflows and its scrollbars stay accurate.
+
+                 UseLayoutRounding pins element edges to whole device pixels. Without it a
+                 fractional scale leaves cell borders and the column headers on half pixels,
+                 and they visibly slide against each other as the zoom changes.
+
+                 TextFormattingMode is switched in code rather than set here: see ApplyZoom. -->
+            <Grid.LayoutTransform>
+                <ScaleTransform x:Name="Zoom" ScaleX="1" ScaleY="1"/>
+            </Grid.LayoutTransform>
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0" Margin="0,0,0,12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="200"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <ComboBox Grid.Column="0" x:Name="FilterBox" IsSynchronizedWithCurrentItem="False"
-                          MaxDropDownHeight="380" SelectionChanged="Filter_Changed"/>
-                <TextBox Grid.Column="1" x:Name="Search" Margin="8,0,0,0"
-                         TextChanged="Search_TextChanged"
-                         ToolTip="Filter by name or game"/>
+            <Grid x:Name="VaultView" Grid.Row="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" x:Name="FilterBar" Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="200"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- The way back. The collapse button goes away with the panel it hides,
+                         so the expand half has to live on this side of the window. -->
+                    <Button Grid.Column="0" x:Name="ExpandButton" Visibility="Collapsed"
+                            Style="{StaticResource IconButton}" Click="ToggleLeftPanel_Click"
+                            Padding="7,7" Margin="0,0,8,0" ToolTip="Show the entry panel">
+                        <Path Data="{StaticResource ChevronsLeft}" StrokeThickness="1.5"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              StrokeLineJoin="Round" RenderTransformOrigin="0.5,0.5"
+                              Stroke="{Binding Foreground,
+                                       RelativeSource={RelativeSource AncestorType=Button}}">
+                            <!-- Same glyph, mirrored, so the pair reads as one control -->
+                            <Path.RenderTransform>
+                                <ScaleTransform ScaleX="-1"/>
+                            </Path.RenderTransform>
+                        </Path>
+                    </Button>
+
+                    <ComboBox Grid.Column="1" x:Name="FilterBox" IsSynchronizedWithCurrentItem="False"
+                              MaxDropDownHeight="380" SelectionChanged="Filter_Changed"/>
+
+                    <ToggleButton Grid.Column="2" x:Name="ColumnsButton" Width="34" Margin="8,0,0,0"
+                                  Style="{StaticResource IconToggle}" ToolTip="Choose columns">
+                        <!-- Sliders: rails with a handle riding each one, at staggered
+                             positions so it reads as "adjust" and not "menu". -->
+                        <Canvas Width="16" Height="16">
+                            <Path Data="{StaticResource SliderRails}" StrokeThickness="1.3"
+                                  Stroke="{Binding Foreground,
+                                           RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
+                            <Rectangle Canvas.Left="9.5" Canvas.Top="0.5" Width="3" Height="6"
+                                       RadiusX="1.5" RadiusY="1.5"
+                                       Fill="{Binding Foreground,
+                                              RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
+                            <Rectangle Canvas.Left="3.5" Canvas.Top="5" Width="3" Height="6"
+                                       RadiusX="1.5" RadiusY="1.5"
+                                       Fill="{Binding Foreground,
+                                              RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
+                            <Rectangle Canvas.Left="11" Canvas.Top="9.5" Width="3" Height="6"
+                                       RadiusX="1.5" RadiusY="1.5"
+                                       Fill="{Binding Foreground,
+                                              RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
+                        </Canvas>
+                    </ToggleButton>
+
+                    <TextBox Grid.Column="3" x:Name="Search" Margin="8,0,0,0"
+                             TextChanged="Search_TextChanged"
+                             ToolTip="Filter by name or game"/>
+
+                    <!-- Sits at the end of the bar, directly over where the grid's scrollbar
+                         starts, so hiding and showing it happens in the one spot. -->
+                    <Button Grid.Column="4" x:Name="HideBarButton"
+                            Style="{StaticResource IconButton}" Click="ToggleFilterBar_Click"
+                            Padding="7,7" Margin="8,0,0,0" ToolTip="Hide the filter bar">
+                        <Path Data="{StaticResource ChevronsLeft}" StrokeThickness="1.5"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              StrokeLineJoin="Round" RenderTransformOrigin="0.5,0.5"
+                              Stroke="{Binding Foreground,
+                                       RelativeSource={RelativeSource AncestorType=Button}}">
+                            <!-- The same double chevron the panel uses, stood on end. One
+                                 glyph for "this folds away", whichever edge it folds to. -->
+                            <Path.RenderTransform>
+                                <RotateTransform Angle="90"/>
+                            </Path.RenderTransform>
+                        </Path>
+                    </Button>
+
+                    <Popup PlacementTarget="{Binding ElementName=ColumnsButton}" Placement="Bottom"
+                           StaysOpen="False" AllowsTransparency="True" PopupAnimation="None"
+                           IsOpen="{Binding IsChecked, ElementName=ColumnsButton, Mode=TwoWay}">
+                        <!-- Shadow cast by a sibling behind the card, so the labels are not
+                             inside an Effect subtree and do not get rasterised. -->
+                        <Grid Margin="0,2,8,10">
+                            <Border Background="{StaticResource Surface0}" CornerRadius="4">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="10" ShadowDepth="2"
+                                                      Opacity="0.5" Color="#000000"/>
+                                </Border.Effect>
+                            </Border>
+                            <Border Background="{StaticResource Surface0}"
+                                    BorderBrush="{StaticResource Surface1}" BorderThickness="1"
+                                    CornerRadius="4" Padding="3,5"
+                                    TextOptions.TextFormattingMode="Ideal">
+                            <StackPanel MinWidth="140">
+                                <TextBlock Text="COLUMNS" Foreground="{StaticResource Overlay0}"
+                                           FontSize="10" FontWeight="SemiBold" Margin="10,3,10,5"/>
+                                <CheckBox x:Name="ColName" Content="Name" Click="Column_Toggled"/>
+                                <CheckBox x:Name="ColGame" Content="Game" Click="Column_Toggled"/>
+                                <CheckBox x:Name="ColSens" Content="Sens" Click="Column_Toggled"/>
+                                <CheckBox x:Name="ColDpi" Content="DPI" Click="Column_Toggled"/>
+                                <CheckBox x:Name="ColCm" Content="cm/360" Click="Column_Toggled"/>
+                                <CheckBox x:Name="ColDate" Content="Date" Click="Column_Toggled"/>
+                            </StackPanel>
+                            </Border>
+                        </Grid>
+                    </Popup>
+                </Grid>
+
+                <!-- MinWidth per column is the resize floor: enough for the header plus a few
+                     characters, so a column can never be dragged down to nothing. Past that
+                     the grid scrolls horizontally rather than crushing the columns.
+
+                     Only the two text columns are star-sized. If the fixed ones were stars too
+                     they would fall under their MinWidth on a narrow window and clamp back up.
+                     WPF does not reclaim that space from the wide columns, so the total
+                     overflows and a horizontal scrollbar appears well above the size floor. -->
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <!-- Auto, and the rail inside is Collapsed while the bar is up, so
+                             this costs nothing until there is something to put in it. -->
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                <DataGrid Grid.Column="0" x:Name="Grid_"
+                          AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                          HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                          Background="{StaticResource Base}" BorderThickness="0"
+                          HorizontalGridLinesBrush="{StaticResource Surface0}"
+                          HorizontalScrollBarVisibility="Auto"
+                          RowHeight="34" SelectionMode="Extended"
+                          VirtualizingPanel.VirtualizationMode="Standard"
+                          PreviewMouseLeftButtonDown="Grid_PreviewMouseLeftButtonDown"
+                          PreviewMouseLeftButtonUp="Grid_PreviewMouseLeftButtonUp"
+                          PreviewMouseRightButtonDown="Grid_PreviewMouseRightButtonDown"
+                          ContextMenuOpening="Grid_ContextMenuOpening">
+                    <!-- One menu on the grid rather than one per row: the row it is about to
+                         act on is whatever the right-click just selected, and a single
+                         instance is the one the code can reach to enable and disable. -->
+                    <DataGrid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem x:Name="RenameItem" Header="Rename" Click="RowRename_Click"/>
+                            <MenuItem x:Name="DuplicateItem" Header="Duplicate"
+                                      Click="RowDuplicate_Click"/>
+                            <Separator/>
+                            <MenuItem x:Name="CopyItem" Header="Copy" Click="RowCopy_Click"/>
+                            <MenuItem x:Name="PasteItem" Header="Paste" Click="RowPaste_Click"/>
+                            <Separator/>
+                            <MenuItem x:Name="DeleteItem" Header="Delete" Click="RowDelete_Click"/>
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn x:Name="NameColumn" Header="NAME" Binding="{Binding Name}"
+                                            Width="*" MinWidth="110"
+                                            ElementStyle="{StaticResource Trimmed}"
+                                            EditingElementStyle="{StaticResource CellEditor}"/>
+                        <!-- A template column rather than a text one: a game is not free text,
+                             it carries the yaw constant every number in the row depends on. -->
+                        <DataGridTemplateColumn x:Name="GameColumn" Header="GAME" Width="*" MinWidth="110"
+                                                SortMemberPath="Game">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Game}" TextTrimming="CharacterEllipsis"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                            <DataGridTemplateColumn.CellEditingTemplate>
+                                <DataTemplate>
+                                    <ComboBox Style="{StaticResource CellCombo}"
+                                              ItemsSource="{Binding Games,
+                                                           RelativeSource={RelativeSource AncestorType=Window}}"
+                                              IsEditable="True" IsTextSearchEnabled="True"
+                                              StaysOpenOnEdit="True" MaxDropDownHeight="380"
+                                              IsSynchronizedWithCurrentItem="False"
+                                              Loaded="GameCell_Loaded"
+                                              SelectionChanged="GameCell_SelectionChanged"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellEditingTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn x:Name="SensColumn" Header="SENS"
+                                            Binding="{Binding Sens, StringFormat={}{0:G6}}"
+                                            Width="92" MinWidth="76"
+                                            ElementStyle="{StaticResource Copyable}"
+                                            EditingElementStyle="{StaticResource CellEditor}"/>
+                        <DataGridTextColumn x:Name="DpiColumn" Header="DPI" Binding="{Binding Dpi}"
+                                            Width="80" MinWidth="64"
+                                            EditingElementStyle="{StaticResource CellEditor}"/>
+                        <DataGridTextColumn x:Name="CmColumn" Header="CM/360"
+                                            Binding="{Binding Cm360, StringFormat={}{0:F1}}"
+                                            IsReadOnly="True" Width="96" MinWidth="82">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource Copyable}">
+                                    <Setter Property="Foreground" Value="#FFFFFF"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn x:Name="DateColumn" Header="DATE"
+                                            Binding="{Binding Added, StringFormat={}{0:MMM d yyyy}}"
+                                            IsReadOnly="True" Width="108" MinWidth="96">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{StaticResource Overlay0}"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- All that is left of the bar once it is folded away, and the only way back.
+                     Top-aligned, in the same column as the button that hid it, so the chevron
+                     is still under the cursor that just clicked it.
+
+                     Only this one button. The panel's own expand chevron stays in its one
+                     place at the left of the bar and goes down with it. -->
+                <Button Grid.Column="1" x:Name="ShowBarButton" VerticalAlignment="Top"
+                        Visibility="Collapsed" Style="{StaticResource IconButton}"
+                        Click="ToggleFilterBar_Click" Padding="7,7"
+                        ToolTip="Show the filter bar">
+                    <Path Data="{StaticResource ChevronsLeft}" StrokeThickness="1.5"
+                          StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                          StrokeLineJoin="Round" RenderTransformOrigin="0.5,0.5"
+                          Stroke="{Binding Foreground,
+                                   RelativeSource={RelativeSource AncestorType=Button}}">
+                        <Path.RenderTransform>
+                            <RotateTransform Angle="-90"/>
+                        </Path.RenderTransform>
+                    </Path>
+                </Button>
+                </Grid>
+
+                <Border Grid.Row="1" x:Name="Toast" Opacity="0" IsHitTestVisible="False"
+                        HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,20"
+                        Background="{StaticResource Surface1}" CornerRadius="16" Padding="16,8">
+                    <Border.RenderTransform>
+                        <TranslateTransform x:Name="ToastShift" Y="10"/>
+                    </Border.RenderTransform>
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="14" ShadowDepth="3" Opacity="0.55" Color="#000000"/>
+                    </Border.Effect>
+                    <TextBlock x:Name="ToastText" Foreground="{StaticResource Text}" FontSize="12"/>
+                </Border>
             </Grid>
 
-            <!-- MinWidth per column is the resize floor: enough for the header plus a few
-                 characters, so a column can never be dragged down to nothing. Past that
-                 the grid scrolls horizontally rather than crushing the columns.
+            <Grid x:Name="SettingsView" Grid.Row="0" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock x:Name="SettingsTitle" Text="Themes" FontSize="17"
+                               FontWeight="SemiBold" Foreground="{StaticResource Text}"/>
+                    <TextBlock x:Name="SettingsBlurb" Text="Nothing here yet."
+                               FontSize="12" Foreground="{StaticResource Overlay0}"
+                               Margin="0,8,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Grid>
 
-                 Only the two text columns are star-sized. If the fixed ones were stars too
-                 they would fall under their MinWidth on a narrow window and clamp back up.
-                 WPF does not reclaim that space from the wide columns, so the total
-                 overflows and a horizontal scrollbar appears well above the size floor. -->
-            <DataGrid Grid.Row="1" x:Name="Grid_"
-                      AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
-                      HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                      Background="{StaticResource Base}" BorderThickness="0"
-                      HorizontalGridLinesBrush="{StaticResource Surface0}"
-                      HorizontalScrollBarVisibility="Auto"
-                      RowHeight="34" SelectionMode="Extended"
-                      AllowDrop="True"
-                      PreviewMouseLeftButtonDown="Grid_PreviewMouseLeftButtonDown"
-                      MouseMove="Grid_MouseMove"
-                      Drop="Grid_Drop"
-                      PreviewKeyDown="Grid_PreviewKeyDown">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="NAME" Binding="{Binding Name}"
-                                        Width="*" MinWidth="110"
-                                        ElementStyle="{StaticResource Trimmed}"
-                                        EditingElementStyle="{StaticResource CellEditor}"/>
-                    <!-- A template column rather than a text one: a game is not free text,
-                         it carries the yaw constant every number in the row depends on. -->
-                    <DataGridTemplateColumn Header="GAME" Width="*" MinWidth="110"
-                                            SortMemberPath="Game">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding Game}" TextTrimming="CharacterEllipsis"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                        <DataGridTemplateColumn.CellEditingTemplate>
-                            <DataTemplate>
-                                <ComboBox Style="{StaticResource CellCombo}"
-                                          ItemsSource="{Binding Games,
-                                                       RelativeSource={RelativeSource AncestorType=Window}}"
-                                          IsEditable="True" IsTextSearchEnabled="True"
-                                          StaysOpenOnEdit="True" MaxDropDownHeight="380"
-                                          IsSynchronizedWithCurrentItem="False"
-                                          Loaded="GameCell_Loaded"
-                                          SelectionChanged="GameCell_SelectionChanged"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellEditingTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTextColumn x:Name="SensColumn" Header="SENS"
-                                        Binding="{Binding Sens, StringFormat={}{0:G6}}"
-                                        Width="92" MinWidth="76"
-                                        EditingElementStyle="{StaticResource CellEditor}">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Cursor" Value="Hand"/>
-                                <Setter Property="ToolTip" Value="Click to copy"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
-                    <DataGridTextColumn Header="DPI" Binding="{Binding Dpi}"
-                                        Width="80" MinWidth="64"
-                                        EditingElementStyle="{StaticResource CellEditor}"/>
-                    <DataGridTextColumn Header="CM/360" Binding="{Binding Cm360, StringFormat={}{0:F1}}"
-                                        IsReadOnly="True" Width="96" MinWidth="82">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="#FFFFFF"/>
-                                <Setter Property="FontWeight" Value="SemiBold"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
-                    <DataGridTextColumn Header="ADDED" Binding="{Binding Added, StringFormat={}{0:MMM d yyyy}}"
-                                        IsReadOnly="True" Width="108" MinWidth="96">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="{StaticResource Overlay0}"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
-                </DataGrid.Columns>
-            </DataGrid>
-
-            <Border Grid.Row="1" x:Name="Toast" Opacity="0" IsHitTestVisible="False"
-                    HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,20"
-                    Background="{StaticResource Surface1}" CornerRadius="16" Padding="16,8">
-                <Border.RenderTransform>
-                    <TranslateTransform x:Name="ToastShift" Y="10"/>
-                </Border.RenderTransform>
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="14" ShadowDepth="3" Opacity="0.55" Color="#000000"/>
-                </Border.Effect>
-                <TextBlock x:Name="ToastText" Foreground="{StaticResource Text}" FontSize="12"/>
-            </Border>
-
-            <TextBlock Grid.Row="2" x:Name="Status" Foreground="{StaticResource Overlay0}"
+            <TextBlock Grid.Row="1" x:Name="Status" Foreground="{StaticResource Overlay0}"
                        FontSize="11" Margin="2,10,0,0"/>
         </Grid>
+
     </Grid>
 </Window>

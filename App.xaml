@@ -12,11 +12,26 @@
         <SolidColorBrush x:Key="Crust"    Color="#080808"/>
         <SolidColorBrush x:Key="Surface0" Color="#1E1E1E"/>
         <SolidColorBrush x:Key="Surface1" Color="#2E2E2E"/>
+        <!-- One step above Surface1, reserved for the commit button on each tab: light
+             enough to read as the one thing you press, dark enough not to shout. -->
+        <SolidColorBrush x:Key="Surface2" Color="#3A3A3A"/>
+        <SolidColorBrush x:Key="Surface3" Color="#4A4A4A"/>
         <SolidColorBrush x:Key="Overlay0" Color="#707070"/>
         <SolidColorBrush x:Key="Subtext"  Color="#9C9C9C"/>
         <SolidColorBrush x:Key="Text"     Color="#E8E8E8"/>
         <SolidColorBrush x:Key="Accent"   Color="#E8E8E8"/>
         <SolidColorBrush x:Key="Red"      Color="#E07070"/>
+
+        <!-- Icon geometry, drawn rather than taken from a symbol font: Segoe Fluent Icons
+             is not guaranteed present, and a missing glyph fails as a blank box.
+             The gear is on a 24x24 canvas; the rest are sized to their own use. -->
+        <Geometry x:Key="GearIcon">M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z</Geometry>
+        <Geometry x:Key="SliderRails">M0,3.5 H16 M0,8 H16 M0,12.5 H16</Geometry>
+        <Geometry x:Key="GripIcon">M0,0.5 H10 M0,4.5 H10 M0,8.5 H10</Geometry>
+        <Geometry x:Key="CrossIcon">M0,0 L8,8 M8,0 L0,8</Geometry>
+        <Geometry x:Key="PlusIcon">M5.5,0 V11 M0,5.5 H11</Geometry>
+        <Geometry x:Key="CaretDown">M0,0 L7,0 L3.5,4.5 Z</Geometry>
+        <Geometry x:Key="ChevronsLeft">M4.5,0 L0.5,4.5 L4.5,9 M9.5,0 L5.5,4.5 L9.5,9</Geometry>
 
         <Style x:Key="Label" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource Subtext}"/>
@@ -28,7 +43,20 @@
             <Setter Property="Background" Value="{StaticResource Surface0}"/>
             <Setter Property="Foreground" Value="{StaticResource Text}"/>
             <Setter Property="CaretBrush" Value="{StaticResource Text}"/>
-            <Setter Property="SelectionBrush" Value="{StaticResource Surface1}"/>
+            <!-- Selection used to be Surface1 (#2E2E2E) on a #1E1E1E box: a two-step
+                 difference that read as "the text got slightly darker" rather than as a
+                 highlight. #8A8A8A at 45% composites to about #4E4E4E, which is a clear
+                 jump while staying inside the palette's no-colour-cast rule.
+
+                 Deliberately not the Windows accent: this machine's is #393939, so matching
+                 the system would land right back on invisible.
+
+                 Every text box in the app inherits from here (the one inside the ComboBox
+                 template and the grid's cell editor included), so this one setter covers
+                 selection everywhere. -->
+            <Setter Property="SelectionBrush" Value="#8A8A8A"/>
+            <Setter Property="SelectionOpacity" Value="0.45"/>
+            <Setter Property="SelectionTextBrush" Value="{StaticResource Text}"/>
             <Setter Property="BorderBrush" Value="{StaticResource Surface1}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="6,4"/>
@@ -154,9 +182,17 @@
                                     </ControlTemplate>
                                 </ToggleButton.Template>
                             </ToggleButton>
+                            <!-- All four bindings are load-bearing. DisplayMemberPath is not
+                                 implemented as an ItemTemplate: ItemsControl installs an
+                                 internal template *selector* and leaves ItemTemplate null, so
+                                 a template that binds only SelectionBoxItemTemplate hands the
+                                 presenter no template at all and it falls back to ToString() —
+                                 which is how this box came to read "SensVault.SensProfile". -->
                             <ContentPresenter x:Name="ContentSite" Grid.Column="0" IsHitTestVisible="False"
                                               Content="{TemplateBinding SelectionBoxItem}"
                                               ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                              ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
                                               Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="Left" VerticalAlignment="Center"/>
                             <TextBox x:Name="PART_EditableTextBox" Grid.Column="0" Visibility="Hidden"
@@ -168,19 +204,31 @@
                                    AllowsTransparency="True" Focusable="False"
                                    IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom"
                                    PopupAnimation="None">
-                                <Border Background="{StaticResource Surface0}"
-                                        BorderBrush="{StaticResource Surface1}"
-                                        BorderThickness="1" CornerRadius="4" Margin="0,2,0,6"
-                                        MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
-                                        MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                    <Border.Effect>
-                                        <DropShadowEffect BlurRadius="10" ShadowDepth="2"
-                                                          Opacity="0.5" Color="#000000"/>
-                                    </Border.Effect>
-                                    <ScrollViewer Margin="0,3">
-                                        <ItemsPresenter/>
-                                    </ScrollViewer>
-                                </Border>
+                                <!-- The shadow is cast by a sibling behind the card, never by
+                                     the card itself. An Effect forces its whole subtree through
+                                     an intermediate bitmap, and text rendered that way loses
+                                     ClearType and comes out looking chewed up next to the rest
+                                     of the app. Ideal formatting on top: a popup is a layered
+                                     window, so it cannot have ClearType anyway, and Display's
+                                     whole-pixel snapping is what turns that into "pixelated". -->
+                                <Grid Margin="0,2,0,6">
+                                    <Border Background="{StaticResource Surface0}" CornerRadius="4">
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="10" ShadowDepth="2"
+                                                              Opacity="0.5" Color="#000000"/>
+                                        </Border.Effect>
+                                    </Border>
+                                    <Border Background="{StaticResource Surface0}"
+                                            BorderBrush="{StaticResource Surface1}"
+                                            BorderThickness="1" CornerRadius="4"
+                                            TextOptions.TextFormattingMode="Ideal"
+                                            MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                            MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                        <ScrollViewer Margin="0,3">
+                                            <ItemsPresenter/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </Grid>
                             </Popup>
                         </Grid>
                         <ControlTemplate.Triggers>
@@ -257,9 +305,11 @@
             </Setter>
         </Style>
 
+        <!-- White text on Surface2 lands at 11.4:1 contrast, comfortably past WCAG's 7:1
+             AAA bar, so the label stays legible while the button itself stays quiet. -->
         <Style TargetType="Button">
-            <Setter Property="Foreground" Value="{StaticResource Crust}"/>
-            <Setter Property="Background" Value="{StaticResource Accent}"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="Background" Value="{StaticResource Surface2}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Padding" Value="12,7"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -272,8 +322,12 @@
                                               Margin="{TemplateBinding Padding}"/>
                         </Border>
                         <ControlTemplate.Triggers>
+                            <!-- Brighten, don't dim. Fading a dark button toward a dark panel
+                                 reads as "going away"; only a light button can dim on hover
+                                 and still look pressed. -->
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="b" Property="Opacity" Value="0.85"/>
+                                <Setter TargetName="b" Property="Background"
+                                        Value="{StaticResource Surface3}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="b" Property="Opacity" Value="0.4"/>
@@ -284,9 +338,148 @@
             </Setter>
         </Style>
 
-        <Style x:Key="Ghost" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Background" Value="{StaticResource Surface1}"/>
+        <!-- A square, chromeless button for glyph-only affordances: the column picker's
+             sliders, a row's delete cross, the "add a preset" plus. -->
+        <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource Overlay0}"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="b" Background="{TemplateBinding Background}" CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="b" Property="Background"
+                                        Value="{StaticResource Surface1}"/>
+                                <Setter Property="Foreground" Value="{StaticResource Text}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Framed toggle for the column picker: reads as an input, not a command. -->
+        <Style x:Key="IconToggle" TargetType="ToggleButton">
+            <Setter Property="Foreground" Value="{StaticResource Overlay0}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="b" Background="{StaticResource Surface0}"
+                                BorderBrush="{StaticResource Surface1}" BorderThickness="1"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="b" Property="BorderBrush"
+                                        Value="{StaticResource Overlay0}"/>
+                                <Setter Property="Foreground" Value="{StaticResource Text}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="b" Property="Background"
+                                        Value="{StaticResource Surface1}"/>
+                                <Setter TargetName="b" Property="BorderBrush"
+                                        Value="{StaticResource Overlay0}"/>
+                                <Setter Property="Foreground" Value="{StaticResource Text}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- The stock checkbox paints a light box with black text and looks broken here. -->
+        <Style TargetType="CheckBox">
             <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <!-- Transparent fill across the whole row, so the label and the gap
+                             beside it are as clickable as the 15px box. -->
+                        <Border Background="Transparent" Padding="7,5" CornerRadius="3">
+                            <StackPanel Orientation="Horizontal">
+                                <Border x:Name="box" Width="15" Height="15" CornerRadius="3"
+                                        Background="{StaticResource Surface0}"
+                                        BorderBrush="{StaticResource Overlay0}" BorderThickness="1"
+                                        VerticalAlignment="Center">
+                                    <Path x:Name="tick" Visibility="Collapsed"
+                                          Data="M0,3.2 L2.6,5.8 L7,0.8"
+                                          Stroke="{StaticResource Text}" StrokeThickness="1.7"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                          StrokeLineJoin="Round"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ContentPresenter Margin="9,0,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="box" Property="Background"
+                                        Value="{StaticResource Surface1}"/>
+                                <Setter TargetName="box" Property="BorderBrush"
+                                        Value="{StaticResource Subtext}"/>
+                                <Setter TargetName="tick" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="box" Property="BorderBrush"
+                                        Value="{StaticResource Text}"/>
+                            </Trigger>
+                            <!-- The last visible column disables its own box rather than
+                                 vanishing, so it stays obvious *why* it will not turn off. -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- The stock TabControl template hardcodes <TabPanel IsItemsHost="True"/>, so
+             overriding ItemsPanel alone does nothing. A DockPanel host is what lets the
+             settings tab sit at the far right of the same strip as the text tabs. -->
+        <Style TargetType="TabControl">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid KeyboardNavigation.TabNavigation="Local">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <!-- Column 1 hosts whatever is in Tag: a place for a plain button
+                                 on the tab strip. It cannot go in the items host, because
+                                 only TabItems may live there and a button is an action, not
+                                 a tab. Sitting in its own column puts it just right of the
+                                 last right-docked tab rather than on top of it. -->
+                            <Grid Grid.Row="0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <DockPanel Grid.Column="0" IsItemsHost="True" LastChildFill="False"
+                                           KeyboardNavigation.TabIndex="1"/>
+                                <ContentPresenter Grid.Column="1" Content="{TemplateBinding Tag}"
+                                                  VerticalAlignment="Center"/>
+                            </Grid>
+                            <ContentPresenter Grid.Row="1" ContentSource="SelectedContent"
+                                              KeyboardNavigation.TabIndex="2"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style TargetType="TabItem">
@@ -309,6 +502,22 @@
             </Setter>
         </Style>
 
+        <!-- The invisible grab strip either side of a header that resizes the column.
+             A retemplated header has to re-declare both by name or the DataGrid
+             silently loses column resizing. -->
+        <Style x:Key="HeaderGripper" TargetType="Thumb">
+            <Setter Property="Width" Value="8"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Cursor" Value="SizeWE"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border Background="{TemplateBinding Background}"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="prim:DataGridColumnHeader">
             <Setter Property="Background" Value="{StaticResource Mantle}"/>
             <Setter Property="Foreground" Value="{StaticResource Subtext}"/>
@@ -318,6 +527,55 @@
             <Setter Property="BorderBrush" Value="{StaticResource Surface0}"/>
             <Setter Property="BorderThickness" Value="0,0,1,1"/>
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="prim:DataGridColumnHeader">
+                        <Grid>
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter Grid.Column="0" Margin="{TemplateBinding Padding}"
+                                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                      VerticalAlignment="Center"/>
+                                    <!-- One arrow per sort state, stacked in the same slot: the
+                                         column claims no width while both are collapsed, so an
+                                         unsorted header keeps its full text room. -->
+                                    <Path x:Name="Ascending" Grid.Column="1" Visibility="Collapsed"
+                                          Data="M0,4.5 L3.5,0 L7,4.5 Z" Fill="{StaticResource Text}"
+                                          Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <Path x:Name="Descending" Grid.Column="1" Visibility="Collapsed"
+                                          Data="M0,0 L7,0 L3.5,4.5 Z" Fill="{StaticResource Text}"
+                                          Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                            <Thumb x:Name="PART_LeftHeaderGripper" HorizontalAlignment="Left"
+                                   Style="{StaticResource HeaderGripper}"/>
+                            <Thumb x:Name="PART_RightHeaderGripper" HorizontalAlignment="Right"
+                                   Style="{StaticResource HeaderGripper}"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <!-- The sorted column is also the one whose label brightens, so the
+                                 arrow is a confirmation rather than the only signal. -->
+                            <Trigger Property="SortDirection" Value="Ascending">
+                                <Setter TargetName="Ascending" Property="Visibility" Value="Visible"/>
+                                <Setter Property="Foreground" Value="{StaticResource Text}"/>
+                            </Trigger>
+                            <Trigger Property="SortDirection" Value="Descending">
+                                <Setter TargetName="Descending" Property="Visibility" Value="Visible"/>
+                                <Setter Property="Foreground" Value="{StaticResource Text}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource Text}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style TargetType="DataGridRow">
@@ -337,6 +595,10 @@
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="8,6"/>
             <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <!-- WPF's stock focus visual is a dotted rectangle, and it only appears once
+                 a key has been pressed — Esc cancelling a drag is enough to summon one
+                 mid-grid. The row highlight already says which row is current. -->
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="DataGridCell">
@@ -353,6 +615,75 @@
                     <Setter Property="Padding" Value="5,2"/>
                 </Trigger>
             </Style.Triggers>
+        </Style>
+
+        <!-- Right-click menus. Stock WPF menus are drawn in the system light theme and
+             would arrive as a white card over a dark grid, so the whole thing is retemplated
+             to the same card the column picker uses: Surface0 on a Surface1 hairline. -->
+        <Style TargetType="ContextMenu">
+            <Setter Property="Background" Value="{StaticResource Surface0}"/>
+            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Surface1}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="3,5"/>
+            <Setter Property="MinWidth" Value="150"/>
+            <Setter Property="TextOptions.TextFormattingMode" Value="Ideal"/>
+            <!-- The stock shadow is a system-drawn one that ignores the border radius and
+                 leaves square corners hanging off a rounded card. -->
+            <Setter Property="HasDropShadow" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4" Padding="{TemplateBinding Padding}">
+                            <StackPanel IsItemsHost="True"
+                                        KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="MenuItem">
+            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="b" Background="Transparent" CornerRadius="3"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <!-- IsHighlighted, not IsMouseOver: it is the one the keyboard
+                                 moves as well, so arrowing through lights the same row. -->
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="b" Property="Background"
+                                        Value="{StaticResource Surface1}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{StaticResource Overlay0}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Keyed to the menu's own separator key rather than TargetType, so this reaches
+             separators inside menus and leaves any others alone. -->
+        <Style x:Key="{x:Static MenuItem.SeparatorStyleKey}" TargetType="Separator">
+            <Setter Property="Background" Value="{StaticResource Surface1}"/>
+            <Setter Property="Margin" Value="8,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Separator">
+                        <Border Height="1" Background="{TemplateBinding Background}"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
     </Application.Resources>

@@ -16,14 +16,28 @@ public class SensProfile : INotifyPropertyChanged
     public string Name
     {
         get => _name;
-        set => Set(ref _name, value);
+        set
+        {
+            if (Set(ref _name, value))
+                OnChanged(nameof(Label));
+        }
     }
 
     public string Game
     {
         get => _game;
-        set => Set(ref _game, value);
+        set
+        {
+            if (Set(ref _game, value))
+                OnChanged(nameof(Label));
+        }
     }
+
+    /// <summary>What to call this profile in a picker. A name is optional -- the game and
+    /// numbers already identify a row -- so a nameless profile falls back to its game
+    /// rather than showing as a blank line.</summary>
+    [JsonIgnore]
+    public string Label => string.IsNullOrWhiteSpace(Name) ? Game : Name;
 
     public string Notes
     {

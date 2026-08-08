@@ -1,0 +1,118 @@
+<UserControl x:Class="SensVault.DpiPresetEditor"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             FontFamily="Segoe UI" FontSize="13">
+
+    <UserControl.Resources>
+        <!-- The card is already a raised surface, so rows sit on it rather than painting
+             their own Base fill the way the vault's do. -->
+        <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+            <Setter Property="Background" Value="Transparent"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="Transparent"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource Surface1}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+            <Setter Property="Padding" Value="4,2"/>
+        </Style>
+
+        <!-- Chromeless until you reach for it: the number reads as text in the row, and
+             only shows an input frame on hover or while being edited. -->
+        <Style x:Key="PresetValue" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Width" Value="76"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource Surface1}"/>
+                </Trigger>
+                <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                    <Setter Property="Background" Value="{StaticResource Surface0}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource Overlay0}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <DataGrid x:Name="Rows_" AutoGenerateColumns="False" HeadersVisibility="None"
+                  CanUserAddRows="False" CanUserDeleteRows="False" CanUserResizeRows="False"
+                  CanUserResizeColumns="False" CanUserSortColumns="False"
+                  CanUserReorderColumns="False" IsReadOnly="True"
+                  GridLinesVisibility="None" Background="Transparent" BorderThickness="0"
+                  RowHeight="34" SelectionMode="Single" MaxHeight="270"
+                  HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <DataGrid.Columns>
+                <!-- The grab handle. The whole row drags, not only this; the icon is
+                     there to say so. -->
+                <DataGridTemplateColumn Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Path Data="{StaticResource GripIcon}"
+                                  Stroke="{StaticResource Overlay0}" StrokeThickness="1.3"
+                                  Cursor="SizeAll" Margin="2,0,4,0"
+                                  VerticalAlignment="Center"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Width="*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="DPI" FontSize="11"
+                                           Foreground="{StaticResource Overlay0}"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock Text=":" Margin="5,0,3,0"
+                                           Foreground="{StaticResource Overlay0}"
+                                           VerticalAlignment="Center"/>
+                                <!-- LostFocus, not PropertyChanged: a per-keystroke push
+                                     reformats the value under the caret and "16" on the way
+                                     to "1600" would be rewritten mid-word. -->
+                                <TextBox Style="{StaticResource PresetValue}"
+                                         Text="{Binding Text, UpdateSourceTrigger=LostFocus}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Style="{StaticResource IconButton}" Click="Delete_Click"
+                                    ToolTip="Remove preset" Padding="7,6">
+                                <Path Data="{StaticResource CrossIcon}"
+                                      Stroke="{Binding Foreground,
+                                               RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="1.4" StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"/>
+                            </Button>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Same rule-then-plus shape as the picker's drop-down, so "add one" looks the
+             same wherever you meet it. -->
+        <Border Height="1" Background="{StaticResource Surface1}" Margin="0,4,0,0"/>
+        <Button x:Name="AddRow" Style="{StaticResource IconButton}" Click="Add_Click"
+                Padding="0,9" ToolTip="Add a preset">
+            <Path Data="{StaticResource PlusIcon}"
+                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                  StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+        </Button>
+    </StackPanel>
+</UserControl>

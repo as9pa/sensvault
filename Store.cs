@@ -10,6 +10,45 @@ public class AppData
 
     /// <summary>DPI the entry form was left on, so a new session starts on your mouse.</summary>
     public double LastDpi { get; set; } = 800;
+
+    /// <summary>Vault columns currently hidden, by key. Absent or empty shows everything,
+    /// so a file written before the column picker existed opens with all six.</summary>
+    public List<string> HiddenColumns { get; set; } = [];
+
+    /// <summary>Hand-ordered DPI presets. Nothing reads or writes these right now -- the
+    /// picker that used them is shelved in attic/ -- but the property stays so a saved list
+    /// round-trips through the file untouched and survives until the feature comes back.</summary>
+    public List<double> DpiPresets { get; set; } = [400, 800, 1600, 3200];
+
+    /// <summary>Zoom on the vault side of the window, 0.7 to 2.0.</summary>
+    public double VaultZoom { get; set; } = 1;
+
+    /// <summary>Whether the left entry panel was hidden, leaving only the vault.</summary>
+    public bool PanelCollapsed { get; set; }
+
+    /// <summary>Whether the filter bar above the grid was folded away to its rail. The filter
+    /// and search it holds still apply while it is down, so this travels with
+    /// <see cref="LastFilter"/> rather than replacing it.</summary>
+    public bool BarCollapsed { get; set; }
+
+    /// <summary>Hand-dragged column widths, keyed the same as <see cref="HiddenColumns"/>.
+    /// A column with no entry keeps whatever the XAML asked for.</summary>
+    public Dictionary<string, ColumnWidth> ColumnWidths { get; set; } = [];
+
+    /// <summary>Game the vault was filtered to at close. Empty means all games.</summary>
+    public string LastFilter { get; set; } = "";
+}
+
+/// <summary>
+/// A column's width plus whether it was proportional. Star and pixel widths are not
+/// interchangeable -- restoring a star column as a fixed pixel width would freeze it and
+/// stop it sharing the leftover space when the window resizes -- so the unit travels with
+/// the number.
+/// </summary>
+public class ColumnWidth
+{
+    public double Value { get; set; }
+    public bool Star { get; set; }
 }
 
 public static class Store
