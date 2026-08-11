@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 
@@ -12,6 +13,7 @@ public class SensProfile : INotifyPropertyChanged
     private double _dpi = 800;
     private double _sens = 1;
     private string _notes = "";
+    private bool _direct;
 
     public string Name
     {
@@ -33,11 +35,15 @@ public class SensProfile : INotifyPropertyChanged
         }
     }
 
-    /// <summary>What to call this profile in a picker. A name is optional -- the game and
-    /// numbers already identify a row -- so a nameless profile falls back to its game
-    /// rather than showing as a blank line.</summary>
+    /// <summary>What to call this profile in a picker. Both a name and a game are optional --
+    /// the numbers alone already identify a row -- so each step falls through to the next
+    /// rather than leaving a blank line in a drop-down.</summary>
     [JsonIgnore]
-    public string Label => string.IsNullOrWhiteSpace(Name) ? Game : Name;
+    public string Label =>
+        !string.IsNullOrWhiteSpace(Name) ? Name
+        : !string.IsNullOrWhiteSpace(Game) ? Game
+        : Cm360 > 0 ? string.Format(CultureInfo.CurrentCulture, "{0:F1} cm/360", Cm360)
+        : string.Format(CultureInfo.CurrentCulture, "{0:G6} @ {1:G6} DPI", Sens, Dpi);
 
     public string Notes
     {
@@ -80,11 +86,28 @@ public class SensProfile : INotifyPropertyChanged
         }
     }
 
-    [JsonIgnore]
-    public double Cm360 => SensMath.Cm360(Yaw, Sens, Dpi);
+    /// <summary>Set on rows saved under the "cm/360" pseudo-game: <see cref="Sens"/> is
+    /// already the distance, so no yaw or DPI enters into it.</summary>
+    public bool Direct
+    {
+        get => _direct;
+        set
+        {
+            if (Set(ref _direct, value))
+                Recalc();
+        }
+    }
 
     [JsonIgnore]
-    public double In360 => SensMath.In360(Yaw, Sens, Dpi);
+    public double Cm360 => SensMath.Cm360(Direct, Yaw, Sens, Dpi);
+
+    /// <summary>What the vault's cm/360 column shows. A row saved with no game has no yaw to
+    /// work from, and a blank cell says that far better than a hard "0.0" does.</summary>
+    [JsonIgnore]
+    public string Cm360Text => Cm360 > 0 ? Cm360.ToString("F1", CultureInfo.CurrentCulture) : "";
+
+    [JsonIgnore]
+    public double In360 => SensMath.In360(Direct, Yaw, Sens, Dpi);
 
     [JsonIgnore]
     public double Edpi => Dpi * Sens;
@@ -98,6 +121,7 @@ public class SensProfile : INotifyPropertyChanged
             Yaw = Yaw,
             Dpi = Dpi,
             Sens = Sens,
+            Direct = Direct,
             Order = Order,
             Added = DateTime.Now,
         };
@@ -105,8 +129,10 @@ public class SensProfile : INotifyPropertyChanged
     private void Recalc()
     {
         OnChanged(nameof(Cm360));
+        OnChanged(nameof(Cm360Text));
         OnChanged(nameof(In360));
         OnChanged(nameof(Edpi));
+        OnChanged(nameof(Label));
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

@@ -1,7 +1,9 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -26,12 +28,22 @@ public partial class MainWindow : Window
         "Yaw",
         "Dpi",
         "Sens",
+        "Direct",
     ];
 
     private readonly AppData _data;
     private readonly ObservableCollection<SensProfile> _profiles;
     private readonly ObservableCollection<Game> _games = [];
+
+    /// <summary>The Settings &gt; Games checklist: every game in the library, ticked or not.
+    /// <see cref="_games"/> is what survives it, so this one is the longer of the two.</summary>
+    private readonly ObservableCollection<GameToggle> _toggles = [];
+
     private readonly ICollectionView _view;
+
+    /// <summary>Set while All or None is walking the checklist, so the rebuild that every
+    /// tick would otherwise touch off happens once at the end instead of forty times.</summary>
+    private bool _bulkToggling;
     private readonly SensProfile _draft = new();
 
     /// <summary>Each vault column, the box that shows it, and the key it saves under.</summary>
@@ -45,6 +57,8 @@ public partial class MainWindow : Window
 
     private bool _ready;
     private bool _editing;
+    private bool _filterStale; // a game changed mid-edit; the filter list owes a rebuild
+    private bool _viewStale; // and the grid's view owes a refresh, once the edit is over
     private bool _renaming; // set only while the menu's Rename opens an editor deliberately
     private bool _syncing; // set while writing a linked box, so its TextChanged is ignored
     private bool _drivenByCm; // true when cm/360 was the field the user last typed into
@@ -68,6 +82,10 @@ public partial class MainWindow : Window
         _view = CollectionViewSource.GetDefaultView(_profiles);
         _view.Filter = FilterRow;
         Grid_.ItemsSource = _view;
+
+        // The checklist first: RebuildGames reads it to know what to leave out.
+        BuildToggles();
+        GameList.ItemsSource = _toggles;
 
         RebuildGames();
         RebuildFilter();
@@ -110,11 +128,15 @@ public partial class MainWindow : Window
 
         NoScrollBars.IsChecked = _data.HideScrollBars;
         ApplyScrollBars();
+        NoStatusBar.IsChecked = _data.HideStatusBar;
+        ApplyStatusBar();
+        DataPath.Text = Store.Folder;
         ShowSettingsPage();
+        ApplyDirectMode();
 
         Grid_.BeginningEdit += Grid_BeginningEdit;
-        Grid_.CellEditEnding += (_, _) => _editing = false;
-        Grid_.RowEditEnding += (_, _) => _editing = false;
+        Grid_.CellEditEnding += (_, _) => FinishEditing();
+        Grid_.RowEditEnding += (_, _) => FinishEditing();
 
         _reorder = new RowReorder(
             Grid_,
@@ -133,22 +155,69 @@ public partial class MainWindow : Window
 
         _ready = true;
         SetStatus(Store.FilePath);
+
+        // TEMP probe
+        Loaded += (_, _) =>
+            Dispatcher.BeginInvoke(
+                System.Windows.Threading.DispatcherPriority.Background,
+                new Action(() =>
+                {
+                    // Armed only when the log path is handed in, and only if the two rows it
+                    // drives are actually there. Unguarded this is an unhandled exception on
+                    // the dispatcher, which is a silent instant close for anyone who just
+                    // double-clicks the app -- which is everyone who is not running the probe.
+                    var log = Environment.GetEnvironmentVariable("SV_PROBE_LOG");
+                    if (log is null)
+                        return;
+
+                    var from = _profiles.FirstOrDefault(p => p.Name == "static 60-70");
+                    var to = _games.FirstOrDefault(g => g.Name == "Valorant");
+                    if (from is null || to is null)
+                        return;
+
+                    Clipboard.Clear();
+                    Tabs.SelectedIndex = 1;
+                    FromBox.SelectedItem = from;
+                    ToBox.SelectedItem = to;
+                    Grid_.UpdateLayout();
+                    File.AppendAllText(
+                        log,
+                        $"result={ConvResult.Text} cursor={ConvCard.Cursor} tip={ConvCard.ToolTip}\n"
+                    );
+                    ConvCard_Click(ConvCard, null!);
+                    File.AppendAllText(log, $"clipboard=[{Clipboard.GetText()}]\n");
+                })
+            );
     }
 
     // ---------- game library ----------
+
+    /// <summary>
+    /// Every game the app knows of, in the order the pickers want them, before Settings &gt;
+    /// Games has had its say. Both the checklist and the pickers are built from this, so the
+    /// two always agree on what exists and on what order to list it in.
+    /// </summary>
+    private IEnumerable<Game> Library() =>
+        GameLibrary
+            .BuiltIns()
+            .Concat(_data.CustomGames)
+            // cm/360 is not a game and does not belong buried between Call of Duty and
+            // Counter-Strike, which is where its name alone would put it. It leads.
+            .OrderBy(g => g.Direct ? 0 : 1)
+            .ThenBy(g => g.Name, StringComparer.OrdinalIgnoreCase);
 
     private void RebuildGames()
     {
         var prevAdd = GameBox.SelectedItem as Game;
         var prevTo = ToBox.SelectedItem as Game;
 
+        var hidden = _toggles
+            .Where(t => !t.Shown)
+            .Select(t => t.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         _games.Clear();
-        foreach (
-            var g in GameLibrary
-                .BuiltIns()
-                .Concat(_data.CustomGames)
-                .OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase)
-        )
+        foreach (var g in Library().Where(g => !hidden.Contains(g.Name)))
             _games.Add(g);
 
         if (GameBox.ItemsSource is null)
@@ -159,6 +228,82 @@ public partial class MainWindow : Window
 
         Reselect(GameBox, prevAdd);
         Reselect(ToBox, prevTo);
+
+        GameCount.Text = $"{_games.Count} of {_toggles.Count} shown";
+    }
+
+    // ---------- settings > games ----------
+
+    /// <summary>
+    /// Builds the checklist from the whole library, ticking everything the saved list does
+    /// not name. Matching is by name and case-insensitive, and a saved name that matches
+    /// nothing just falls on the floor -- which is what lets a built-in be renamed or
+    /// dropped in a later version without the file having to be migrated.
+    /// </summary>
+    private void BuildToggles()
+    {
+        var hidden = _data.HiddenGames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        _toggles.Clear();
+        foreach (var g in Library())
+        {
+            var t = new GameToggle { Name = g.Name, Shown = !hidden.Contains(g.Name) };
+
+            // Watching the toggle rather than the checkbox's Click. A tick can be set by
+            // mouse, by the keyboard, or by an assistive tool going through UI Automation --
+            // and that last one moves IsChecked without ever raising Click, so a Click
+            // handler would let the box and the pickers drift apart. The property is the one
+            // thing every route has to go through.
+            t.PropertyChanged += ToggleChanged;
+            _toggles.Add(t);
+        }
+    }
+
+    private void ToggleChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        // Matches is only ever the search box talking to itself; nothing outside this page
+        // cares which rows are on screen.
+        if (e.PropertyName != nameof(GameToggle.Shown) || _bulkToggling)
+            return;
+
+        RebuildGames();
+        Save();
+    }
+
+    private void GameSearch_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        var needle = GameSearch.Text.Trim();
+
+        foreach (var t in _toggles)
+            t.Matches =
+                needle.Length == 0
+                || t.Name.Contains(needle, StringComparison.CurrentCultureIgnoreCase);
+    }
+
+    private void ShowAllGames_Click(object sender, RoutedEventArgs e) => SetAllShown(true);
+
+    private void HideAllGames_Click(object sender, RoutedEventArgs e) => SetAllShown(false);
+
+    /// <summary>
+    /// Ticks or unticks everything the search has left on screen. Rows the search has
+    /// collapsed are left alone: with "counter" typed, None means the four Counter-Strikes
+    /// and not the other thirty-five.
+    /// </summary>
+    private void SetAllShown(bool shown)
+    {
+        _bulkToggling = true;
+        try
+        {
+            foreach (var t in _toggles.Where(t => t.Matches))
+                t.Shown = shown;
+        }
+        finally
+        {
+            _bulkToggling = false;
+        }
+
+        RebuildGames();
+        Save();
     }
 
     private void Reselect(Selector box, Game? previous)
@@ -178,14 +323,40 @@ public partial class MainWindow : Window
         {
             _draft.Game = g.Name;
             _draft.Yaw = g.Yaw;
+            _draft.Direct = g.Direct;
         }
         else
         {
             _draft.Game = "";
             _draft.Yaw = 0;
+            _draft.Direct = false;
         }
 
+        ApplyDirectMode();
         Resync();
+    }
+
+    /// <summary>
+    /// Locks the sensitivity box while a 1:1 game is picked. Those have no in-game
+    /// sensitivity to type -- the number is a distance -- so the cm/360 box below becomes the
+    /// only way in, and the sens box goes read-only and drops to the dead shade the TextBox
+    /// style keeps for exactly that.
+    ///
+    /// It is not blanked, because for a 1:1 game the two boxes really do hold the same
+    /// number. Left showing it, the pair says what the game means: type 34.5 centimetres and
+    /// the sensitivity is 34.5.
+    /// </summary>
+    private void ApplyDirectMode()
+    {
+        if (SensBox is null)
+            return;
+
+        SensBox.IsReadOnly = _draft.Direct;
+
+        // The cm/360 box is the live one now, so it has to be the one Resync computes from.
+        // Without this the panel would go on deriving cm/360 from a sens nobody can reach.
+        if (_draft.Direct)
+            _drivenByCm = true;
     }
 
     // ---------- in-cell game picker ----------
@@ -217,8 +388,24 @@ public partial class MainWindow : Window
         if (sender is not ComboBox { SelectedItem: Game g, DataContext: SensProfile p })
             return;
 
+        // What a row means is the distance it turns through, not the number in its box: the
+        // same 0.4 is a different sweep in every game. So the cm/360 is what is held onto and
+        // the sensitivity is re-solved for whatever game was just picked -- the row keeps
+        // pointing at the same feel instead of quietly becoming a different one.
+        //
+        // This is also what stops a 1:1 game from wrecking the row. Its Sens *is* the
+        // cm/360, so carrying a game's 0.0076 straight across used to land it at 0.0 cm; now
+        // it arrives as the 37 it always was.
+        var cm = p.Cm360;
+
         p.Game = g.Name;
         p.Yaw = g.Yaw;
+        p.Direct = g.Direct;
+
+        // A row with no game to begin with has no distance to carry, so it keeps its number.
+        var sens = SensMath.SensFromCm360(g.Direct, cm, g.Yaw, p.Dpi);
+        if (cm > 0 && sens > 0)
+            p.Sens = sens;
     }
 
     // ---------- linked sens / cm-360 entry ----------
@@ -283,7 +470,12 @@ public partial class MainWindow : Window
 
         if (_drivenByCm)
         {
-            var sens = SensMath.SensFromCm360(ParseOrZero(CmBox.Text), _draft.Yaw, _draft.Dpi);
+            var sens = SensMath.SensFromCm360(
+                _draft.Direct,
+                ParseOrZero(CmBox.Text),
+                _draft.Yaw,
+                _draft.Dpi
+            );
             _draft.Sens = sens;
             SetText(SensBox, sens > 0 ? sens.ToString("G6", CultureInfo.CurrentCulture) : "");
         }
@@ -307,14 +499,19 @@ public partial class MainWindow : Window
 
     private void AddProfile_Click(object sender, RoutedEventArgs e)
     {
-        if (_draft.Yaw <= 0)
+        // The game is optional. Without one there is no yaw, so the row simply carries no
+        // cm/360 -- it is still a sens and a DPI worth writing down, and the vault shows the
+        // cm/360 cell empty rather than pretending to a number it cannot work out.
+        if (_draft.Sens <= 0)
         {
-            Warn("Pick a game first.");
+            Warn(_draft.Direct ? "Enter a cm/360 above zero." : "Sensitivity must be above zero.");
             return;
         }
-        if (_draft.Dpi <= 0 || _draft.Sens <= 0)
+        // Only checked where it is actually used: a distance you typed in centimetres does
+        // not go through the mouse's DPI to get there.
+        if (!_draft.Direct && _draft.Dpi <= 0)
         {
-            Warn("DPI and sens must both be above zero.");
+            Warn("DPI must be above zero.");
             return;
         }
 
@@ -334,11 +531,13 @@ public partial class MainWindow : Window
         _draft.Sens = 0;
 
         // Neither box was the one typed into any more; without this the next keystroke in
-        // one of them would be treated as a correction to whichever led last time.
-        _drivenByCm = false;
+        // one of them would be treated as a correction to whichever led last time. On a 1:1
+        // game there is no choice to reset to -- the sens box is locked, so cm/360 stays in
+        // charge for the next entry.
+        _drivenByCm = _draft.Direct;
 
-        var label = string.IsNullOrWhiteSpace(p.Name) ? p.Game : $"\"{p.Name}\"";
-        SetStatus($"Saved {label} at {p.Cm360:F1} cm/360.");
+        var label = string.IsNullOrWhiteSpace(p.Name) ? p.Label : $"\"{p.Name}\"";
+        SetStatus(p.Cm360 > 0 ? $"Saved {label} at {p.Cm360:F1} cm/360." : $"Saved {label}.");
     }
 
     /// <summary>Removes the selected rows. Callers check that there is a selection first --
@@ -625,16 +824,28 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>One line per profile, in the same formats the grid shows.</summary>
-    private static string Describe(SensProfile p) =>
-        string.Format(
+    /// <summary>One line per profile, in the same formats the grid shows. Each part is left
+    /// out when it would say nothing: a cm/360 row has no meaningful sens-and-DPI behind it,
+    /// and a row saved with no game has no cm/360 in front of it.</summary>
+    private static string Describe(SensProfile p)
+    {
+        if (p.Direct)
+            return string.Format(
+                CultureInfo.CurrentCulture,
+                "{0} — {1:F1} cm/360",
+                p.Label,
+                p.Cm360
+            );
+
+        var head = string.Format(
             CultureInfo.CurrentCulture,
-            "{0} — {1:G6} @ {2:G6} DPI — {3:F1} cm/360",
+            "{0} — {1:G6} @ {2:G6} DPI",
             p.Label,
             p.Sens,
-            p.Dpi,
-            p.Cm360
+            p.Dpi
         );
+        return p.Cm360Text.Length == 0 ? head : $"{head} — {p.Cm360Text} cm/360";
+    }
 
     private static string Count(int n) => $"{n} profile{(n == 1 ? "" : "s")}";
 
@@ -692,11 +903,17 @@ public partial class MainWindow : Window
 
         // Matches each column's own formatting, so what lands on the clipboard is what the
         // row shows rather than a full-precision double.
-        Copy(
+        var text =
             column == CmColumn
-                ? pressed.Cm360.ToString("F1", CultureInfo.CurrentCulture)
-                : pressed.Sens.ToString("G6", CultureInfo.CurrentCulture)
-        );
+                ? pressed.Cm360Text
+                : pressed.Sens.ToString("G6", CultureInfo.CurrentCulture);
+
+        // An empty cm/360 cell -- a row with no game -- has nothing to put on the clipboard,
+        // and a toast reading "Copied" with nothing after it would be worse than no toast.
+        if (text.Length == 0)
+            return;
+
+        Copy(text);
     }
 
     private void Copy(string text)
@@ -781,7 +998,7 @@ public partial class MainWindow : Window
 
         Renumber();
         var moved = origin.Value.Item;
-        var label = string.IsNullOrWhiteSpace(moved.Name) ? moved.Game : $"\"{moved.Name}\"";
+        var label = string.IsNullOrWhiteSpace(moved.Name) ? moved.Label : $"\"{moved.Name}\"";
         SetStatus($"Moved {label} to position {Grid_.Items.IndexOf(moved) + 1}.");
     }
 
@@ -805,23 +1022,51 @@ public partial class MainWindow : Window
         ConvCm.Text = "";
         ConvDot.Visibility = Visibility.Collapsed;
         ConvDetail.Text = "";
+        ArmCopy(false);
 
         if (FromBox.SelectedItem is not SensProfile src)
             return;
         if (ToBox.SelectedItem is not Game dst)
             return;
-        if (!TryNum(ToDpi.Text, out var dpi))
+
+        // A target of cm/360 needs no DPI to get there, so a blank one does not stop it.
+        var hasDpi = TryNum(ToDpi.Text, out var dpi);
+        if (!hasDpi && !dst.Direct)
             return;
 
-        var sens = SensMath.SensFromCm360(src.Cm360, dst.Yaw, dpi);
+        var sens = SensMath.SensFromCm360(dst.Direct, src.Cm360, dst.Yaw, dpi);
         if (sens <= 0)
             return;
 
         // The conversion preserves cm/360 by definition, so the source's is the result's.
         ConvResult.Text = sens.ToString("G6");
+        ConvDetail.Text = dst.Direct ? dst.Name : $"{dst.Name} for {dpi:F0} DPI";
+        ArmCopy(true);
+
+        // Restating the distance next to a result that already is the distance would just be
+        // the same number twice.
+        if (dst.Direct)
+            return;
+
         ConvCm.Text = $"{src.Cm360:F1} cm/360";
         ConvDot.Visibility = Visibility.Visible;
-        ConvDetail.Text = $"{dst.Name} for {dpi:F0} DPI";
+    }
+
+    /// <summary>Turns the result card's click-to-copy affordances on and off. A hand cursor
+    /// over a card reading "--" would be promising something there is nothing behind.</summary>
+    private void ArmCopy(bool live)
+    {
+        ConvCard.Cursor = live ? Cursors.Hand : Cursors.Arrow;
+        ConvCard.ToolTip = live ? "Click to copy" : null;
+    }
+
+    private void ConvCard_Click(object sender, MouseButtonEventArgs e)
+    {
+        // Same guard the cursor uses: nothing converted, nothing to put on the clipboard.
+        if (ConvCard.Cursor != Cursors.Hand)
+            return;
+
+        Copy(ConvResult.Text);
     }
 
     private void SaveConverted_Click(object sender, RoutedEventArgs e)
@@ -831,13 +1076,13 @@ public partial class MainWindow : Window
             Warn("Pick a source profile and a target game.");
             return;
         }
-        if (!TryNum(ToDpi.Text, out var dpi))
+        if (!TryNum(ToDpi.Text, out var dpi) && !dst.Direct)
         {
             Warn("Target DPI must be a positive number.");
             return;
         }
 
-        var sens = SensMath.SensFromCm360(src.Cm360, dst.Yaw, dpi);
+        var sens = SensMath.SensFromCm360(dst.Direct, src.Cm360, dst.Yaw, dpi);
         if (sens <= 0)
         {
             Warn("Nothing to convert yet.");
@@ -850,6 +1095,7 @@ public partial class MainWindow : Window
                 Name = $"{dst.Name} (from {src.Label})",
                 Game = dst.Name,
                 Yaw = dst.Yaw,
+                Direct = dst.Direct,
                 Dpi = dpi,
                 Sens = sens,
                 Order = _profiles.Count,
@@ -887,11 +1133,60 @@ public partial class MainWindow : Window
 
     private void Filter_Changed(object sender, SelectionChangedEventArgs e)
     {
-        _view?.Refresh();
+        RefreshView();
         Save();
     }
 
-    private void Search_TextChanged(object sender, TextChangedEventArgs e) => _view?.Refresh();
+    private void Search_TextChanged(object sender, TextChangedEventArgs e) => RefreshView();
+
+    /// <summary>
+    /// Re-runs the filter over the vault, or books it in for later if a cell is being edited.
+    ///
+    /// A CollectionView refuses outright to refresh inside an edit transaction -- it throws
+    /// rather than returning -- and the grid opens one for the whole time a cell editor is
+    /// up. The in-cell game picker types-to-search, so it writes a new game on any keystroke
+    /// that matches one, which reaches here through OnProfileEdited while that editor is
+    /// still open. That is the crash: changing a row's game from inside the grid took the
+    /// app down, and it did it most reliably on the last row of a filtered game, where the
+    /// game leaving the list moves the filter box's selection as well.
+    /// </summary>
+    private void RefreshView()
+    {
+        if (_editing)
+        {
+            _viewStale = true;
+            return;
+        }
+        _view?.Refresh();
+    }
+
+    /// <summary>Closes out an edit and pays off whatever it deferred.</summary>
+    private void FinishEditing()
+    {
+        _editing = false;
+        if (!_filterStale && !_viewStale)
+            return;
+
+        // Queued, because CellEditEnding fires from *inside* the transaction it is ending --
+        // the commit has not happened yet, so a refresh from here would throw exactly as it
+        // did before. Background priority sits after the commit and after layout.
+        Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Background,
+            new Action(() =>
+            {
+                if (_filterStale)
+                {
+                    _filterStale = false;
+                    RebuildFilter();
+                }
+                if (_viewStale)
+                {
+                    _viewStale = false;
+                    _view?.Refresh();
+                }
+            })
+        );
+    }
 
     private bool FilterRow(object item)
     {
@@ -1073,18 +1368,25 @@ public partial class MainWindow : Window
     /// </summary>
     private void ShowSettingsPage()
     {
-        if (SettingsTitle is null || SettingsBlurb is null || GeneralSettings is null)
+        if (
+            SettingsTitle is null
+            || SettingsBlurb is null
+            || GeneralSettings is null
+            || GamesSettings is null
+        )
             return;
 
         var page = (SettingsNav.SelectedItem as ListBoxItem)?.Content as string ?? "General";
         SettingsTitle.Text = page;
 
         var general = page == "General";
+        var games = page == "Games";
         GeneralSettings.Visibility = general ? Visibility.Visible : Visibility.Collapsed;
+        GamesSettings.Visibility = games ? Visibility.Visible : Visibility.Collapsed;
 
         // The blurb is the placeholder for a page with no controls yet; a page that has some
         // does not need to be told it is empty.
-        SettingsBlurb.Visibility = general ? Visibility.Collapsed : Visibility.Visible;
+        SettingsBlurb.Visibility = general || games ? Visibility.Collapsed : Visibility.Visible;
     }
 
     // ---------- general settings ----------
@@ -1093,6 +1395,28 @@ public partial class MainWindow : Window
     {
         ApplyScrollBars();
         Save();
+    }
+
+    /// <summary>
+    /// Opens the folder holding data.json -- the vault and any custom games are both in that
+    /// one file -- so it can be backed up or hand-edited.
+    ///
+    /// UseShellExecute is what makes this Explorer rather than an attempt to run a directory
+    /// as a program: it hands the path to the shell, which resolves the association. .NET
+    /// defaults it to false outside of .NET Framework, so it has to be asked for. The folder
+    /// is created first because it does not exist until the first save.
+    /// </summary>
+    private void OpenDataFolder_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Directory.CreateDirectory(Store.Folder);
+            Process.Start(new ProcessStartInfo(Store.Folder) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            Warn("Could not open the folder: " + ex.Message);
+        }
     }
 
     /// <summary>
@@ -1110,7 +1434,23 @@ public partial class MainWindow : Window
         Grid_.HorizontalScrollBarVisibility = bars;
         CreateScroll.VerticalScrollBarVisibility = bars;
         ConvertScroll.VerticalScrollBarVisibility = bars;
+        GamesScroll.VerticalScrollBarVisibility = bars;
     }
+
+    private void NoStatusBar_Click(object sender, RoutedEventArgs e)
+    {
+        ApplyStatusBar();
+        Save();
+    }
+
+    /// <summary>
+    /// Collapsed rather than Hidden, unlike the scrollbars: the status line sits in an Auto
+    /// row, so collapsing it hands its height back to the grid above. Hidden would leave the
+    /// blank strip behind, which is the part being asked for.
+    /// </summary>
+    private void ApplyStatusBar() =>
+        Status.Visibility =
+            NoStatusBar.IsChecked == true ? Visibility.Collapsed : Visibility.Visible;
 
     // ---------- zoom ----------
     //
@@ -1323,7 +1663,15 @@ public partial class MainWindow : Window
         if (e.PropertyName is not null && Persisted.Contains(e.PropertyName))
         {
             if (e.PropertyName == nameof(SensProfile.Game))
-                RebuildFilter();
+            {
+                // Held back mid-edit: rebuilding swaps the filter box's list, which moves its
+                // selection, which refreshes the view -- see RefreshView for why that is fatal
+                // while a cell editor is open.
+                if (_editing)
+                    _filterStale = true;
+                else
+                    RebuildFilter();
+            }
             Save();
         }
     }
@@ -1335,11 +1683,13 @@ public partial class MainWindow : Window
 
         _data.Profiles = [.. _profiles];
         _data.HiddenColumns = [.. _columns.Where(c => c.Box.IsChecked != true).Select(c => c.Key)];
+        _data.HiddenGames = [.. _toggles.Where(t => !t.Shown).Select(t => t.Name)];
         _data.LastFilter = FilterBox.SelectedItem as string ?? "";
         _data.VaultZoom = Zoom.ScaleX;
         _data.PanelCollapsed = LeftPanel.Visibility != Visibility.Visible;
         _data.BarCollapsed = FilterBar.Visibility != Visibility.Visible;
         _data.HideScrollBars = NoScrollBars.IsChecked == true;
+        _data.HideStatusBar = NoStatusBar.IsChecked == true;
         CaptureColumnWidths();
         if (_draft.Dpi > 0)
             _data.LastDpi = _draft.Dpi;

@@ -37,4 +37,24 @@ public static class SensMath
             return 0;
         return 360.0 / (cm360 / CmPerInch * dpi * sens);
     }
+
+    // ---------- the cm/360 pseudo-game ----------
+    //
+    // "cm/360" sits in the game list as a way to hold a distance you already know, with its
+    // sensitivity reading 1:1 as centimetres -- no yaw and no DPI in the way.
+    //
+    // It has to be a flag rather than another yaw constant, and this is why: cm/360 is
+    // 360 * 2.54 / (yaw * sens * dpi), which *falls* as sens rises. Asking for cm/360 == sens
+    // would need a yaw that changed with the sens it was multiplying, and that is not a
+    // constant. So the fork lives here, in the three conversions that would otherwise
+    // divide by a yaw of zero.
+
+    public static double Cm360(bool direct, double yaw, double sens, double dpi) =>
+        direct ? Math.Max(sens, 0) : Cm360(yaw, sens, dpi);
+
+    public static double In360(bool direct, double yaw, double sens, double dpi) =>
+        direct ? Math.Max(sens, 0) / CmPerInch : In360(yaw, sens, dpi);
+
+    public static double SensFromCm360(bool direct, double cm360, double yaw, double dpi) =>
+        direct ? Math.Max(cm360, 0) : SensFromCm360(cm360, yaw, dpi);
 }

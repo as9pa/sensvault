@@ -15,6 +15,14 @@ public class AppData
     /// so a file written before the column picker existed opens with all six.</summary>
     public List<string> HiddenColumns { get; set; } = [];
 
+    /// <summary>Games left out of every picker, by name. Stored as the names rather than as
+    /// whole <see cref="Game"/> entries because the library itself is compiled in and gets
+    /// rebuilt on each launch -- only the choice about it belongs in the file. A name here
+    /// that no longer matches any game is simply ignored, so a renamed or dropped built-in
+    /// costs nothing. Empty shows the whole library, which is what a file written before
+    /// Settings &gt; Games existed opens as.</summary>
+    public List<string> HiddenGames { get; set; } = [];
+
     /// <summary>Hand-ordered DPI presets. Nothing reads or writes these right now -- the
     /// picker that used them is shelved in attic/ -- but the property stays so a saved list
     /// round-trips through the file untouched and survives until the feature comes back.</summary>
@@ -41,6 +49,10 @@ public class AppData
     /// <summary>Whether the scrollbars are hidden throughout. The wheel still scrolls -- this
     /// takes away the bars, not the scrolling.</summary>
     public bool HideScrollBars { get; set; }
+
+    /// <summary>Whether the status line under the vault is folded away. It is also where
+    /// warnings surface, so hiding it is a real trade and the settings page says so.</summary>
+    public bool HideStatusBar { get; set; }
 }
 
 /// <summary>

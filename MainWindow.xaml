@@ -103,6 +103,10 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
                                     <TextBlock Text="Sensitivity" Style="{StaticResource Label}"/>
+                                    <!-- Locked by ApplyDirectMode whenever the game picked is a
+                                         1:1 one, where there is no in-game sensitivity to speak
+                                         of. It keeps showing the number, because for those the
+                                         sens and the cm/360 are the same one. -->
                                     <TextBox x:Name="SensBox" Text="1" TextChanged="SensBox_TextChanged"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
@@ -168,8 +172,13 @@
                             <TextBlock Text="Target DPI" Style="{StaticResource Label}"/>
                             <TextBox x:Name="ToDpi" TextChanged="ToDpi_TextChanged"/>
 
-                            <Border Background="{StaticResource Surface0}" CornerRadius="6"
-                                    Padding="12,10" Margin="0,16,0,0">
+                            <!-- The whole card copies, not a button on it: the converted number
+                                 is the one thing this tab exists to hand you. The cursor and
+                                 tooltip are armed from RefreshConvert so they only appear when
+                                 there is actually a result under them. -->
+                            <Border x:Name="ConvCard" Background="{StaticResource Surface0}"
+                                    CornerRadius="6" Padding="12,10" Margin="0,16,0,0"
+                                    MouseLeftButtonUp="ConvCard_Click">
                                 <StackPanel>
                                     <TextBlock Text="Converted Sensitivity" Style="{StaticResource Label}"
                                                Margin="0,0,0,4"/>
@@ -210,7 +219,7 @@
                              Background="Transparent" BorderThickness="0"
                              SelectionChanged="SettingsNav_SelectionChanged">
                         <ListBoxItem Content="General"/>
-                        <ListBoxItem Content="Themes"/>
+                        <ListBoxItem Content="Games"/>
                     </ListBox>
                 </TabItem>
             </TabControl>
@@ -426,8 +435,13 @@
                         <DataGridTextColumn x:Name="DpiColumn" Header="DPI" Binding="{Binding Dpi}"
                                             Width="80" MinWidth="64"
                                             EditingElementStyle="{StaticResource CellEditor}"/>
+                        <!-- Bound to the pre-formatted string, not the double: a row saved
+                             with no game has no cm/360 to show and the text is empty there,
+                             where a numeric binding could only render a misleading 0.0.
+                             SortMemberPath puts the header's sort back on the number, so the
+                             column still orders 9 before 10. -->
                         <DataGridTextColumn x:Name="CmColumn" Header="CM/360"
-                                            Binding="{Binding Cm360, StringFormat={}{0:F1}}"
+                                            Binding="{Binding Cm360Text}" SortMemberPath="Cm360"
                                             IsReadOnly="True" Width="96" MinWidth="82">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock" BasedOn="{StaticResource Copyable}">
@@ -483,23 +497,131 @@
                 </Border>
             </Grid>
 
+            <!-- Two rows rather than one stack: the Games page holds a list as long as the
+                 library and has to be able to give it every pixel below the heading and then
+                 scroll. Inside a StackPanel it would be measured against infinite height, run
+                 off the bottom of the window and never show a scrollbar. -->
             <Grid x:Name="SettingsView" Grid.Row="0" Visibility="Collapsed">
-                <StackPanel>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0">
                     <TextBlock x:Name="SettingsTitle" Text="General" FontSize="17"
                                FontWeight="SemiBold" Foreground="{StaticResource Text}"/>
                     <TextBlock x:Name="SettingsBlurb" Text="Nothing here yet."
                                FontSize="12" Foreground="{StaticResource Overlay0}"
                                Margin="0,8,0,0" TextWrapping="Wrap"/>
-
-                    <StackPanel x:Name="GeneralSettings" Visibility="Collapsed" Margin="0,14,0,0">
-                        <CheckBox x:Name="NoScrollBars" Content="Disable scrollbars"
-                                  Click="NoScrollBars_Click"/>
-                        <TextBlock Text="Hides the scrollbars in the vault and the entry panel. The wheel still scrolls; only the bars go away."
-                                   FontSize="12" Foreground="{StaticResource Overlay0}"
-                                   Margin="24,4,0,0" TextWrapping="Wrap" MaxWidth="420"
-                                   HorizontalAlignment="Left"/>
-                    </StackPanel>
                 </StackPanel>
+
+                <StackPanel Grid.Row="1" x:Name="GeneralSettings" Visibility="Collapsed"
+                            Margin="0,14,0,0" VerticalAlignment="Top">
+                    <CheckBox x:Name="NoScrollBars" Content="Disable scrollbars"
+                              Click="NoScrollBars_Click"/>
+                    <TextBlock Text="Hides the scrollbars in the vault and the entry panel. The wheel still scrolls; only the bars go away."
+                               FontSize="12" Foreground="{StaticResource Overlay0}"
+                               Margin="24,4,0,0" TextWrapping="Wrap" MaxWidth="420"
+                               HorizontalAlignment="Left"/>
+
+                    <CheckBox x:Name="NoStatusBar" Content="Hide the status bar"
+                              Margin="0,10,0,0" Click="NoStatusBar_Click"/>
+                    <TextBlock Text="Takes back the line under the vault. Warnings show up there too, so with it hidden a refused save says nothing at all."
+                               FontSize="12" Foreground="{StaticResource Overlay0}"
+                               Margin="24,4,0,0" TextWrapping="Wrap" MaxWidth="420"
+                               HorizontalAlignment="Left"/>
+
+                    <TextBlock Text="Data folder" Foreground="{StaticResource Text}"
+                               FontWeight="SemiBold" Margin="0,22,0,0"/>
+                    <TextBlock Text="Your saved sensitivities and any custom games both live in data.json in this folder. Close SensVault before editing it by hand -- it rewrites the file on exit, over whatever you changed."
+                               FontSize="12" Foreground="{StaticResource Overlay0}"
+                               Margin="0,4,0,0" TextWrapping="Wrap" MaxWidth="420"
+                               HorizontalAlignment="Left"/>
+                    <!-- The path is selectable so it can be copied even if the folder
+                         cannot be opened. A machine with no shell association for a
+                         directory would otherwise leave nothing to go on. -->
+                    <TextBox x:Name="DataPath" IsReadOnly="True" Margin="0,8,0,0"
+                             MaxWidth="420" HorizontalAlignment="Left"
+                             FontSize="12" Foreground="{StaticResource Subtext}"/>
+                    <Button Content="Open data folder" Click="OpenDataFolder_Click"
+                            Margin="0,8,0,0" Padding="14,7"
+                            HorizontalAlignment="Left"/>
+                </StackPanel>
+
+                <!-- Games. The library is compiled into the app, so unticking here is the
+                     only way to trim it: what comes off is written to HiddenGames in
+                     data.json and left out of every picker.
+
+                     Rows already saved under a hidden game go on working untouched. A
+                     profile carries its own yaw, so nothing it shows or computes depends on
+                     the library still offering that game; it just cannot be re-picked from a
+                     drop-down until the game is ticked back on. -->
+                <Grid Grid.Row="1" x:Name="GamesSettings" Visibility="Collapsed"
+                      Margin="0,14,0,0" MaxWidth="420" HorizontalAlignment="Left">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="12"
+                               Foreground="{StaticResource Overlay0}"
+                               Text="Untick a game to keep it out of the Add, Convert and in-vault pickers. Sensitivities you have already saved under it are not touched."/>
+
+                    <Grid Grid.Row="1" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBox Grid.Column="0" x:Name="GameSearch"
+                                 TextChanged="GameSearch_TextChanged"
+                                 ToolTip="Narrow the list by name"/>
+                        <!-- Both buttons act on what the search has left showing, not on the
+                             whole library: with "counter" typed, None is how you drop the
+                             five Counter-Strikes in one go without touching anything else. -->
+                        <Button Grid.Column="1" Content="All" Click="ShowAllGames_Click"
+                                Margin="8,0,0,0" Padding="12,7" MinWidth="52"
+                                ToolTip="Tick everything currently listed"/>
+                        <Button Grid.Column="2" Content="None" Click="HideAllGames_Click"
+                                Margin="6,0,0,0" Padding="12,7" MinWidth="52"
+                                ToolTip="Untick everything currently listed"/>
+                    </Grid>
+
+                    <!-- ItemsControl rather than ListBox: there is nothing to select here.
+                         A ListBox would draw a selection highlight behind whichever row was
+                         last clicked and leave it there, which reads as a second, competing
+                         kind of "on" next to the tick that actually means it.
+
+                         Every game in the library has a row here at all times and the search
+                         only collapses the ones it does not match, rather than the list being
+                         filtered down to the matches. See GameToggle.Matches for why: a row
+                         that is only hidden cannot be torn down, and it was the tearing down
+                         that used to untick games behind your back.
+
+                         So IsChecked can stay two-way, which is what keeps the tick honest no
+                         matter how it was set: mouse, keyboard, or a screen reader driving
+                         the box through UI Automation. Nothing here listens for a click. -->
+                    <ScrollViewer Grid.Row="2" x:Name="GamesScroll" Margin="0,10,0,0"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl x:Name="GameList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox Content="{Binding Name}"
+                                              IsChecked="{Binding Shown}"
+                                              Visibility="{Binding Matches,
+                                                           Converter={StaticResource BoolToVis}}"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <TextBlock Grid.Row="3" x:Name="GameCount" Margin="7,8,0,0"
+                               FontSize="11" Foreground="{StaticResource Overlay0}"/>
+                </Grid>
             </Grid>
 
             <TextBlock Grid.Row="1" x:Name="Status" Foreground="{StaticResource Overlay0}"

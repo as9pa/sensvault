@@ -6,6 +6,8 @@
              StartupUri="MainWindow.xaml">
     <Application.Resources>
 
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+
         <!-- pure neutral grays, no colour cast -->
         <SolidColorBrush x:Key="Base"     Color="#141414"/>
         <SolidColorBrush x:Key="Mantle"   Color="#0F0F0F"/>
@@ -72,6 +74,26 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+            <Style.Triggers>
+                <!-- A box you cannot type in should not look like one you can.
+                     Everything moves one step the other way: a live box sits *above* its
+                     panel at Surface0 on Mantle, so a dead one sinks below it to Crust and
+                     reads as a recess rather than a field. The border loses its contrast and
+                     the text drops from Text to Overlay0, which is the same grey the app
+                     already uses for "here, but not for you".
+
+                     On the style rather than at each call site, so every read-only box in the
+                     app gets it: the locked sensitivity box on the Create panel and the
+                     data-folder path in settings both come through here. A Foreground set
+                     inline still wins, since a local value outranks a style trigger. -->
+                <Trigger Property="IsReadOnly" Value="True">
+                    <Setter Property="Background" Value="{StaticResource Crust}"/>
+                    <Setter Property="Foreground" Value="{StaticResource Overlay0}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource Surface0}"/>
+                    <!-- Nothing is going in, so nothing should blink as though it might. -->
+                    <Setter Property="CaretBrush" Value="Transparent"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <!-- A DataGridTextColumn hands its editor DefaultEditingElementStyle, which outranks
