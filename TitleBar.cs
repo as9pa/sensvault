@@ -17,29 +17,43 @@ internal static class TitleBar
     private const int CaptionColor = 35; // DWMWA_CAPTION_COLOR, Win11 only
     private const int TextColor = 36; // DWMWA_TEXT_COLOR,    Win11 only
 
-    // COLORREF is 0x00BBGGRR. The palette is pure gray, so the channel order is moot.
-    private const int Mantle = 0x000F0F0F;
-    private const int Surface1 = 0x002E2E2E;
-    private const int Text = 0x00E8E8E8;
-
-    public static void MakeDark(Window window)
+    /// <summary>
+    /// Paints the caption bar, its border and its text in a theme's colours.
+    ///
+    /// Safe to call before the window has a handle -- it simply does nothing, and the caller
+    /// runs it again from SourceInitialized. That matters because a theme can be picked at any
+    /// point, including from the constructor, long before there is an hwnd to talk to.
+    /// </summary>
+    public static void Apply(Window window, Theme theme)
     {
         var hwnd = new WindowInteropHelper(window).Handle;
         if (hwnd == IntPtr.Zero)
             return;
 
-        var on = 1;
-        if (Set(hwnd, UseImmersiveDarkMode, ref on) != 0)
-            Set(hwnd, UseImmersiveDarkModePre20H1, ref on);
+        // Immersive dark mode is what colours the minimise/maximise/close glyphs, and it is
+        // the only part of this that Windows 10 understands. A light theme has to turn it back
+        // off rather than just leave it: the explicit colours below are Windows 11 only, so on
+        // 10 this flag is the whole story.
+        var dark = theme.Light ? 0 : 1;
+        if (Set(hwnd, UseImmersiveDarkMode, ref dark) != 0)
+            Set(hwnd, UseImmersiveDarkModePre20H1, ref dark);
 
         // Unsupported on Windows 10; the call just returns a failure HRESULT and the
         // immersive dark mode above already carries that case.
-        var caption = Mantle;
-        var border = Surface1;
-        var text = Text;
+        var caption = ColorRef(theme.Mantle);
+        var border = ColorRef(theme.Surface1);
+        var text = ColorRef(theme.Text);
         Set(hwnd, CaptionColor, ref caption);
         Set(hwnd, BorderColor, ref border);
         Set(hwnd, TextColor, ref text);
+    }
+
+    /// <summary>A COLORREF is 0x00BBGGRR -- the channel order is the reverse of the #RRGGBB
+    /// the palettes are written in, which the old pure-grey palette hid.</summary>
+    private static int ColorRef(string hex)
+    {
+        var c = Theme.Parse(hex);
+        return c.R | (c.G << 8) | (c.B << 16);
     }
 
     private static int Set(IntPtr hwnd, int attribute, ref int value) =>

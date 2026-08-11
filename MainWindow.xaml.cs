@@ -44,6 +44,10 @@ public partial class MainWindow : Window
     /// <summary>Set while All or None is walking the checklist, so the rebuild that every
     /// tick would otherwise touch off happens once at the end instead of forty times.</summary>
     private bool _bulkToggling;
+
+    /// <summary>The Settings &gt; Themes grid, one swatch per palette.</summary>
+    private readonly ObservableCollection<ThemeCard> _themes = [];
+
     private readonly SensProfile _draft = new();
 
     /// <summary>Each vault column, the box that shows it, and the key it saves under.</summary>
@@ -77,6 +81,12 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         _data = Store.Load();
+
+        // Before anything is measured or drawn. Applying a theme only writes colours into
+        // brushes the window already holds, so a later change repaints just as well -- but
+        // doing it first is what stops the default flashing up behind the saved one.
+        BuildThemes();
+
         _profiles = new ObservableCollection<SensProfile>(_data.Profiles.OrderBy(p => p.Order));
 
         _view = CollectionViewSource.GetDefaultView(_profiles);
@@ -149,8 +159,10 @@ public partial class MainWindow : Window
             FinishReorder
         );
 
-        // The non-client area is drawn by the OS, not WPF, so it stays light unless asked.
-        SourceInitialized += (_, _) => TitleBar.MakeDark(this);
+        // The non-client area is drawn by the OS, not WPF, so it keeps the system's colours
+        // unless asked. There is no hwnd to ask until the source exists, which is why the
+        // theme applied above could not do this itself.
+        SourceInitialized += (_, _) => TitleBar.Apply(this, ThemeManager.Current);
         Closing += (_, _) => Save();
 
         _ready = true;
@@ -1373,6 +1385,7 @@ public partial class MainWindow : Window
             || SettingsBlurb is null
             || GeneralSettings is null
             || GamesSettings is null
+            || ThemeSettings is null
         )
             return;
 
@@ -1381,12 +1394,15 @@ public partial class MainWindow : Window
 
         var general = page == "General";
         var games = page == "Games";
+        var themes = page == "Themes";
         GeneralSettings.Visibility = general ? Visibility.Visible : Visibility.Collapsed;
         GamesSettings.Visibility = games ? Visibility.Visible : Visibility.Collapsed;
+        ThemeSettings.Visibility = themes ? Visibility.Visible : Visibility.Collapsed;
 
         // The blurb is the placeholder for a page with no controls yet; a page that has some
         // does not need to be told it is empty.
-        SettingsBlurb.Visibility = general || games ? Visibility.Collapsed : Visibility.Visible;
+        SettingsBlurb.Visibility =
+            general || games || themes ? Visibility.Collapsed : Visibility.Visible;
     }
 
     // ---------- general settings ----------
@@ -1441,6 +1457,49 @@ public partial class MainWindow : Window
     {
         ApplyStatusBar();
         Save();
+    }
+
+    // ---------- themes ----------
+
+    /// <summary>
+    /// Builds the swatch grid and applies whichever theme the vault file asked for.
+    ///
+    /// Grouped through a CollectionView rather than by sorting the list into three, because
+    /// the headings on the page are the group names -- they come from the view, so there is
+    /// nowhere for a heading and its contents to drift apart.
+    /// </summary>
+    private void BuildThemes()
+    {
+        foreach (var theme in ThemeLibrary.All)
+            _themes.Add(new ThemeCard { Theme = theme });
+
+        var view = CollectionViewSource.GetDefaultView(_themes);
+        view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ThemeCard.Group)));
+        ThemeList.ItemsSource = view;
+
+        ApplyTheme(ThemeLibrary.ByName(_data.Theme));
+    }
+
+    private void ThemeCard_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: ThemeCard card })
+        {
+            ApplyTheme(card.Theme);
+            Save();
+        }
+    }
+
+    /// <summary>Paints the app in a theme and moves the ring to its swatch.</summary>
+    private void ApplyTheme(Theme theme)
+    {
+        ThemeManager.Apply(theme);
+
+        foreach (var card in _themes)
+            card.Selected = ReferenceEquals(card.Theme, theme);
+
+        // No-op until the window has a handle; the SourceInitialized hook covers the first
+        // call, and every later one comes through here.
+        TitleBar.Apply(this, theme);
     }
 
     /// <summary>
@@ -1690,6 +1749,7 @@ public partial class MainWindow : Window
         _data.BarCollapsed = FilterBar.Visibility != Visibility.Visible;
         _data.HideScrollBars = NoScrollBars.IsChecked == true;
         _data.HideStatusBar = NoStatusBar.IsChecked == true;
+        _data.Theme = ThemeManager.Current.Name;
         CaptureColumnWidths();
         if (_draft.Dpi > 0)
             _data.LastDpi = _draft.Dpi;
@@ -1706,15 +1766,22 @@ public partial class MainWindow : Window
 
     // ---------- status line ----------
 
+    // SetResourceReference, not an assignment of what FindResource returned. FindResource
+    // hands back the brush that is in the dictionary now, and a theme change replaces it --
+    // so an assigned brush is a snapshot, and the status line would be the one piece of text
+    // still painted in the theme it was written under. A resource reference is the code-behind
+    // spelling of DynamicResource and re-resolves on every swap, which is also what lets the
+    // line keep reading as a warning across a theme change rather than quietly reverting.
+
     private void SetStatus(string text)
     {
-        Status.Foreground = (Brush)FindResource("Overlay0");
+        Status.SetResourceReference(TextBlock.ForegroundProperty, "Overlay0");
         Status.Text = $"{text}   │   {_profiles.Count} saved";
     }
 
     private void Warn(string text)
     {
-        Status.Foreground = (Brush)FindResource("Red");
+        Status.SetResourceReference(TextBlock.ForegroundProperty, "Red");
         Status.Text = text;
     }
 

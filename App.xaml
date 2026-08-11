@@ -8,7 +8,14 @@
 
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
 
-        <!-- pure neutral grays, no colour cast -->
+        <!-- The palette. These values are Vault Dark, the default, and they are what the
+             designer renders — but at runtime ThemeManager.Apply replaces every one of them.
+
+             Which is why each of these keys is referenced as a DynamicResource throughout,
+             and the styles and geometry below are not: a StaticResource keeps the object it
+             resolved to at parse time, so it would go on painting the theme the app started
+             in. See ThemeManager for why swapping is the only route and mutating in place is
+             not available. -->
         <SolidColorBrush x:Key="Base"     Color="#141414"/>
         <SolidColorBrush x:Key="Mantle"   Color="#0F0F0F"/>
         <SolidColorBrush x:Key="Crust"    Color="#080808"/>
@@ -23,6 +30,34 @@
         <SolidColorBrush x:Key="Text"     Color="#E8E8E8"/>
         <SolidColorBrush x:Key="Accent"   Color="#E8E8E8"/>
         <SolidColorBrush x:Key="Red"      Color="#E07070"/>
+        <!-- Ink that cannot be derived from Text. TextStrong is the emphasis above it, and
+             ButtonText is the label on Surface2 — which is a dark chip in most themes but the
+             dialog's own face colour in the Classic pair, where white would vanish. -->
+        <SolidColorBrush x:Key="TextStrong" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="ButtonText" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="Selection"  Color="#8A8A8A"/>
+        <!-- The two edges of a 1px chisel, drawn only by the Classic themes. Both collapse to
+             nothing elsewhere, because BevelTL and BevelBR below go to zero thickness. -->
+        <SolidColorBrush x:Key="BevelLight" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="BevelDark"  Color="#808080"/>
+
+        <!-- Shape. Every CornerRadius in the app comes from one of these five, so the Classic
+             themes can square the whole window at once. -->
+        <CornerRadius x:Key="RadSm">3</CornerRadius>
+        <CornerRadius x:Key="RadMd">4</CornerRadius>
+        <CornerRadius x:Key="RadLg">5</CornerRadius>
+        <CornerRadius x:Key="RadCard">6</CornerRadius>
+        <CornerRadius x:Key="RadPill">16</CornerRadius>
+
+        <!-- Top-left and bottom-right of the bevel, as two layers: a Border paints all four
+             edges with one brush, so a raised or sunken frame cannot be done in a single one.
+             Raised puts BevelLight on TL, sunken swaps them. -->
+        <Thickness x:Key="BevelTL">0</Thickness>
+        <Thickness x:Key="BevelBR">0</Thickness>
+
+        <!-- The flat hairline round a field or a framed toggle. It goes to zero exactly when
+             the bevel comes on, so a Classic control wears one edge rather than two stacked. -->
+        <Thickness x:Key="EdgeT">1</Thickness>
 
         <!-- Icon geometry, drawn rather than taken from a symbol font: Segoe Fluent Icons
              is not guaranteed present, and a missing glyph fails as a blank box.
@@ -36,15 +71,15 @@
         <Geometry x:Key="ChevronsLeft">M4.5,0 L0.5,4.5 L4.5,9 M9.5,0 L5.5,4.5 L9.5,9</Geometry>
 
         <Style x:Key="Label" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource Subtext}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Subtext}"/>
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="Margin" Value="0,10,0,3"/>
         </Style>
 
         <Style TargetType="TextBox">
-            <Setter Property="Background" Value="{StaticResource Surface0}"/>
-            <Setter Property="Foreground" Value="{StaticResource Text}"/>
-            <Setter Property="CaretBrush" Value="{StaticResource Text}"/>
+            <Setter Property="Background" Value="{DynamicResource Surface0}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource Text}"/>
             <!-- Selection used to be Surface1 (#2E2E2E) on a #1E1E1E box: a two-step
                  difference that read as "the text got slightly darker" rather than as a
                  highlight. #8A8A8A at 45% composites to about #4E4E4E, which is a clear
@@ -56,11 +91,11 @@
                  Every text box in the app inherits from here (the one inside the ComboBox
                  template and the grid's cell editor included), so this one setter covers
                  selection everywhere. -->
-            <Setter Property="SelectionBrush" Value="#8A8A8A"/>
+            <Setter Property="SelectionBrush" Value="{DynamicResource Selection}"/>
             <Setter Property="SelectionOpacity" Value="0.45"/>
-            <Setter Property="SelectionTextBrush" Value="{StaticResource Text}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource Surface1}"/>
-            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="SelectionTextBrush" Value="{DynamicResource Text}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Surface1}"/>
+            <Setter Property="BorderThickness" Value="{DynamicResource EdgeT}"/>
             <Setter Property="Padding" Value="6,4"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -68,8 +103,18 @@
                         <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4">
-                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
+                                CornerRadius="{DynamicResource RadMd}">
+                            <!-- Sunken: the shadow falls at the top-left, which is what tells
+                                 a Classic field apart from a Classic button. Zero thickness in
+                                 every other theme, so these two layers cost nothing there. -->
+                            <Border BorderBrush="{DynamicResource BevelDark}"
+                                    BorderThickness="{DynamicResource BevelTL}">
+                                <Border BorderBrush="{DynamicResource BevelLight}"
+                                        BorderThickness="{DynamicResource BevelBR}">
+                                    <ScrollViewer x:Name="PART_ContentHost"
+                                                  Margin="{TemplateBinding Padding}"/>
+                                </Border>
+                            </Border>
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
@@ -87,9 +132,9 @@
                      data-folder path in settings both come through here. A Foreground set
                      inline still wins, since a local value outranks a style trigger. -->
                 <Trigger Property="IsReadOnly" Value="True">
-                    <Setter Property="Background" Value="{StaticResource Crust}"/>
-                    <Setter Property="Foreground" Value="{StaticResource Overlay0}"/>
-                    <Setter Property="BorderBrush" Value="{StaticResource Surface0}"/>
+                    <Setter Property="Background" Value="{DynamicResource Crust}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource Overlay0}"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource Surface0}"/>
                     <!-- Nothing is going in, so nothing should blink as though it might. -->
                     <Setter Property="CaretBrush" Value="Transparent"/>
                 </Trigger>
@@ -100,8 +145,8 @@
              the implicit TextBox style above and leaves a white box on the dark grid. Every
              editable column has to point at this explicitly. -->
         <Style x:Key="CellEditor" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-            <Setter Property="Background" Value="{StaticResource Surface1}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource Overlay0}"/>
+            <Setter Property="Background" Value="{DynamicResource Surface1}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Overlay0}"/>
             <!-- A 34px row leaves the editor very little once the cell's own padding is
                  taken out. Any margin here, plus generous padding, squeezes the content
                  host below one line height and clips the glyphs through the middle.
@@ -130,8 +175,8 @@
                                     <Thumb>
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
-                                                <Border Background="{StaticResource Surface1}"
-                                                        CornerRadius="5" Margin="2,0"/>
+                                                <Border Background="{DynamicResource Surface1}"
+                                                        CornerRadius="{DynamicResource RadLg}" Margin="2,0"/>
                                             </ControlTemplate>
                                         </Thumb.Template>
                                     </Thumb>
@@ -157,10 +202,10 @@
 
         <!-- full ComboBox retemplate; the stock one renders a white box on dark themes -->
         <Style TargetType="ComboBox">
-            <Setter Property="Foreground" Value="{StaticResource Text}"/>
-            <Setter Property="Background" Value="{StaticResource Surface0}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource Surface1}"/>
-            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+            <Setter Property="Background" Value="{DynamicResource Surface0}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Surface1}"/>
+            <Setter Property="BorderThickness" Value="{DynamicResource EdgeT}"/>
             <Setter Property="Padding" Value="8,5"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -178,7 +223,14 @@
                                     Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="4"/>
+                                    CornerRadius="{DynamicResource RadMd}">
+                                <!-- Sunken, to match the text box it sits beside. -->
+                                <Border BorderBrush="{DynamicResource BevelDark}"
+                                        BorderThickness="{DynamicResource BevelTL}">
+                                    <Border BorderBrush="{DynamicResource BevelLight}"
+                                            BorderThickness="{DynamicResource BevelBR}"/>
+                                </Border>
+                            </Border>
                             <ToggleButton Grid.ColumnSpan="2"
                                           Focusable="False" ClickMode="Press" Background="Transparent"
                                           IsChecked="{Binding IsDropDownOpen, Mode=TwoWay,
@@ -189,16 +241,16 @@
                                             <Path x:Name="Arrow"
                                                   HorizontalAlignment="Right" VerticalAlignment="Center"
                                                   Margin="0,0,10,0" Data="M0,0 L7,0 L3.5,4.5 Z"
-                                                  Fill="{StaticResource Overlay0}"/>
+                                                  Fill="{DynamicResource Overlay0}"/>
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
                                                 <Setter TargetName="Arrow" Property="Fill"
-                                                        Value="{StaticResource Text}"/>
+                                                        Value="{DynamicResource Text}"/>
                                             </Trigger>
                                             <Trigger Property="IsChecked" Value="True">
                                                 <Setter TargetName="Arrow" Property="Fill"
-                                                        Value="{StaticResource Text}"/>
+                                                        Value="{DynamicResource Text}"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -219,7 +271,7 @@
                                               HorizontalAlignment="Left" VerticalAlignment="Center"/>
                             <TextBox x:Name="PART_EditableTextBox" Grid.Column="0" Visibility="Hidden"
                                      Background="Transparent" BorderThickness="0" Padding="0"
-                                     Foreground="{StaticResource Text}"
+                                     Foreground="{DynamicResource Text}"
                                      Margin="{TemplateBinding Padding}" VerticalAlignment="Center"
                                      IsReadOnly="{TemplateBinding IsReadOnly}"/>
                             <Popup x:Name="PART_Popup" Grid.ColumnSpan="2"
@@ -234,15 +286,15 @@
                                      window, so it cannot have ClearType anyway, and Display's
                                      whole-pixel snapping is what turns that into "pixelated". -->
                                 <Grid Margin="0,2,0,6">
-                                    <Border Background="{StaticResource Surface0}" CornerRadius="4">
+                                    <Border Background="{DynamicResource Surface0}" CornerRadius="{DynamicResource RadMd}">
                                         <Border.Effect>
                                             <DropShadowEffect BlurRadius="10" ShadowDepth="2"
                                                               Opacity="0.5" Color="#000000"/>
                                         </Border.Effect>
                                     </Border>
-                                    <Border Background="{StaticResource Surface0}"
-                                            BorderBrush="{StaticResource Surface1}"
-                                            BorderThickness="1" CornerRadius="4"
+                                    <Border Background="{DynamicResource Surface0}"
+                                            BorderBrush="{DynamicResource Surface1}"
+                                            BorderThickness="1" CornerRadius="{DynamicResource RadMd}"
                                             TextOptions.TextFormattingMode="Ideal"
                                             MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
                                             MaxHeight="{TemplateBinding MaxDropDownHeight}">
@@ -259,10 +311,10 @@
                                 <Setter TargetName="ContentSite" Property="Visibility" Value="Hidden"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Overlay0}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Overlay0}"/>
                             </Trigger>
                             <Trigger Property="IsDropDownOpen" Value="True">
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Overlay0}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Overlay0}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -274,29 +326,29 @@
              padding of its own, so here Padding counts once rather than twice: the text
              lands on (5 cell - 2 margin) + 3 padding + 2. -->
         <Style x:Key="CellCombo" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
-            <Setter Property="Background" Value="{StaticResource Surface1}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource Overlay0}"/>
+            <Setter Property="Background" Value="{DynamicResource Surface1}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Overlay0}"/>
             <Setter Property="MinHeight" Value="28"/>
             <Setter Property="Margin" Value="-2,0,-2,0"/>
             <Setter Property="Padding" Value="3,2"/>
         </Style>
 
         <Style TargetType="ComboBoxItem">
-            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text}"/>
             <Setter Property="Padding" Value="8,6"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBoxItem">
-                        <Border x:Name="b" Background="Transparent" CornerRadius="3" Margin="3,1"
+                        <Border x:Name="b" Background="Transparent" CornerRadius="{DynamicResource RadSm}" Margin="3,1"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="b" Property="Background" Value="{StaticResource Surface1}"/>
+                                <Setter TargetName="b" Property="Background" Value="{DynamicResource Surface1}"/>
                             </Trigger>
                             <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="b" Property="Background" Value="{StaticResource Surface1}"/>
+                                <Setter TargetName="b" Property="Background" Value="{DynamicResource Surface1}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -305,21 +357,21 @@
         </Style>
 
         <Style TargetType="ListBoxItem">
-            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text}"/>
             <Setter Property="Padding" Value="8,5"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="b" Background="Transparent" CornerRadius="3" Margin="2,1"
+                        <Border x:Name="b" Background="Transparent" CornerRadius="{DynamicResource RadSm}" Margin="2,1"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="b" Property="Background" Value="{StaticResource Surface1}"/>
+                                <Setter TargetName="b" Property="Background" Value="{DynamicResource Surface1}"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="b" Property="Background" Value="{StaticResource Surface1}"/>
+                                <Setter TargetName="b" Property="Background" Value="{DynamicResource Surface1}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -330,8 +382,8 @@
         <!-- White text on Surface2 lands at 11.4:1 contrast, comfortably past WCAG's 7:1
              AAA bar, so the label stays legible while the button itself stays quiet. -->
         <Style TargetType="Button">
-            <Setter Property="Foreground" Value="#FFFFFF"/>
-            <Setter Property="Background" Value="{StaticResource Surface2}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ButtonText}"/>
+            <Setter Property="Background" Value="{DynamicResource Surface2}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Padding" Value="12,7"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -339,9 +391,18 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="b" Background="{TemplateBinding Background}" CornerRadius="5">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              Margin="{TemplateBinding Padding}"/>
+                        <Border x:Name="b" Background="{TemplateBinding Background}"
+                                CornerRadius="{DynamicResource RadLg}">
+                            <!-- Raised, the mirror of the field: light to the top-left. -->
+                            <Border BorderBrush="{DynamicResource BevelLight}"
+                                    BorderThickness="{DynamicResource BevelTL}">
+                                <Border BorderBrush="{DynamicResource BevelDark}"
+                                        BorderThickness="{DynamicResource BevelBR}">
+                                    <ContentPresenter HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"
+                                                      Margin="{TemplateBinding Padding}"/>
+                                </Border>
+                            </Border>
                         </Border>
                         <ControlTemplate.Triggers>
                             <!-- Brighten, don't dim. Fading a dark button toward a dark panel
@@ -349,7 +410,7 @@
                                  and still look pressed. -->
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="b" Property="Background"
-                                        Value="{StaticResource Surface3}"/>
+                                        Value="{DynamicResource Surface3}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="b" Property="Opacity" Value="0.4"/>
@@ -364,20 +425,20 @@
              sliders, a row's delete cross, the "add a preset" plus. -->
         <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="{StaticResource Overlay0}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Overlay0}"/>
             <Setter Property="Padding" Value="6,4"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="b" Background="{TemplateBinding Background}" CornerRadius="4">
+                        <Border x:Name="b" Background="{TemplateBinding Background}" CornerRadius="{DynamicResource RadMd}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
                                               Margin="{TemplateBinding Padding}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="b" Property="Background"
-                                        Value="{StaticResource Surface1}"/>
-                                <Setter Property="Foreground" Value="{StaticResource Text}"/>
+                                        Value="{DynamicResource Surface1}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource Text}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -387,29 +448,37 @@
 
         <!-- Framed toggle for the column picker: reads as an input, not a command. -->
         <Style x:Key="IconToggle" TargetType="ToggleButton">
-            <Setter Property="Foreground" Value="{StaticResource Overlay0}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Overlay0}"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Focusable" Value="False"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
-                        <Border x:Name="b" Background="{StaticResource Surface0}"
-                                BorderBrush="{StaticResource Surface1}" BorderThickness="1"
-                                CornerRadius="4">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border x:Name="b" Background="{DynamicResource Surface0}"
+                                BorderBrush="{DynamicResource Surface1}"
+                                BorderThickness="{DynamicResource EdgeT}"
+                                CornerRadius="{DynamicResource RadMd}">
+                            <Border BorderBrush="{DynamicResource BevelLight}"
+                                    BorderThickness="{DynamicResource BevelTL}">
+                                <Border BorderBrush="{DynamicResource BevelDark}"
+                                        BorderThickness="{DynamicResource BevelBR}">
+                                    <ContentPresenter HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"/>
+                                </Border>
+                            </Border>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="b" Property="BorderBrush"
-                                        Value="{StaticResource Overlay0}"/>
-                                <Setter Property="Foreground" Value="{StaticResource Text}"/>
+                                        Value="{DynamicResource Overlay0}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource Text}"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="b" Property="Background"
-                                        Value="{StaticResource Surface1}"/>
+                                        Value="{DynamicResource Surface1}"/>
                                 <Setter TargetName="b" Property="BorderBrush"
-                                        Value="{StaticResource Overlay0}"/>
-                                <Setter Property="Foreground" Value="{StaticResource Text}"/>
+                                        Value="{DynamicResource Overlay0}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource Text}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -419,7 +488,7 @@
 
         <!-- The stock checkbox paints a light box with black text and looks broken here. -->
         <Style TargetType="CheckBox">
-            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text}"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
@@ -427,18 +496,28 @@
                     <ControlTemplate TargetType="CheckBox">
                         <!-- Transparent fill across the whole row, so the label and the gap
                              beside it are as clickable as the 15px box. -->
-                        <Border Background="Transparent" Padding="7,5" CornerRadius="3">
+                        <Border Background="Transparent" Padding="7,5" CornerRadius="{DynamicResource RadSm}">
                             <StackPanel Orientation="Horizontal">
-                                <Border x:Name="box" Width="15" Height="15" CornerRadius="3"
-                                        Background="{StaticResource Surface0}"
-                                        BorderBrush="{StaticResource Overlay0}" BorderThickness="1"
+                                <Border x:Name="box" Width="15" Height="15"
+                                        CornerRadius="{DynamicResource RadSm}"
+                                        Background="{DynamicResource Surface0}"
+                                        BorderBrush="{DynamicResource Overlay0}"
+                                        BorderThickness="{DynamicResource EdgeT}"
                                         VerticalAlignment="Center">
-                                    <Path x:Name="tick" Visibility="Collapsed"
-                                          Data="M0,3.2 L2.6,5.8 L7,0.8"
-                                          Stroke="{StaticResource Text}" StrokeThickness="1.7"
-                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                                          StrokeLineJoin="Round"
-                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <!-- Sunken, like the fields: a Classic tick box is a well. -->
+                                    <Border BorderBrush="{DynamicResource BevelDark}"
+                                            BorderThickness="{DynamicResource BevelTL}">
+                                        <Border BorderBrush="{DynamicResource BevelLight}"
+                                                BorderThickness="{DynamicResource BevelBR}">
+                                            <Path x:Name="tick" Visibility="Collapsed"
+                                                  Data="M0,3.2 L2.6,5.8 L7,0.8"
+                                                  Stroke="{DynamicResource Text}" StrokeThickness="1.7"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                                  StrokeLineJoin="Round"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"/>
+                                        </Border>
+                                    </Border>
                                 </Border>
                                 <ContentPresenter Margin="9,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
@@ -446,14 +525,14 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="box" Property="Background"
-                                        Value="{StaticResource Surface1}"/>
+                                        Value="{DynamicResource Surface1}"/>
                                 <Setter TargetName="box" Property="BorderBrush"
-                                        Value="{StaticResource Subtext}"/>
+                                        Value="{DynamicResource Subtext}"/>
                                 <Setter TargetName="tick" Property="Visibility" Value="Visible"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="box" Property="BorderBrush"
-                                        Value="{StaticResource Text}"/>
+                                        Value="{DynamicResource Text}"/>
                             </Trigger>
                             <!-- The last visible column disables its own box rather than
                                  vanishing, so it stays obvious *why* it will not turn off. -->
@@ -505,18 +584,18 @@
         </Style>
 
         <Style TargetType="TabItem">
-            <Setter Property="Foreground" Value="{StaticResource Overlay0}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Overlay0}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
                         <Border x:Name="b" Background="Transparent" Padding="14,8" Margin="0,0,4,0"
-                                CornerRadius="5">
+                                CornerRadius="{DynamicResource RadLg}">
                             <ContentPresenter ContentSource="Header"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="b" Property="Background" Value="{StaticResource Surface0}"/>
-                                <Setter Property="Foreground" Value="{StaticResource Text}"/>
+                                <Setter TargetName="b" Property="Background" Value="{DynamicResource Surface0}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource Text}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -541,12 +620,12 @@
         </Style>
 
         <Style TargetType="prim:DataGridColumnHeader">
-            <Setter Property="Background" Value="{StaticResource Mantle}"/>
-            <Setter Property="Foreground" Value="{StaticResource Subtext}"/>
+            <Setter Property="Background" Value="{DynamicResource Mantle}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Subtext}"/>
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Padding" Value="8,7"/>
-            <Setter Property="BorderBrush" Value="{StaticResource Surface0}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Surface0}"/>
             <Setter Property="BorderThickness" Value="0,0,1,1"/>
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="Template">
@@ -568,10 +647,10 @@
                                          column claims no width while both are collapsed, so an
                                          unsorted header keeps its full text room. -->
                                     <Path x:Name="Ascending" Grid.Column="1" Visibility="Collapsed"
-                                          Data="M0,4.5 L3.5,0 L7,4.5 Z" Fill="{StaticResource Text}"
+                                          Data="M0,4.5 L3.5,0 L7,4.5 Z" Fill="{DynamicResource Text}"
                                           Margin="0,0,8,0" VerticalAlignment="Center"/>
                                     <Path x:Name="Descending" Grid.Column="1" Visibility="Collapsed"
-                                          Data="M0,0 L7,0 L3.5,4.5 Z" Fill="{StaticResource Text}"
+                                          Data="M0,0 L7,0 L3.5,4.5 Z" Fill="{DynamicResource Text}"
                                           Margin="0,0,8,0" VerticalAlignment="Center"/>
                                 </Grid>
                             </Border>
@@ -585,14 +664,14 @@
                                  arrow is a confirmation rather than the only signal. -->
                             <Trigger Property="SortDirection" Value="Ascending">
                                 <Setter TargetName="Ascending" Property="Visibility" Value="Visible"/>
-                                <Setter Property="Foreground" Value="{StaticResource Text}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource Text}"/>
                             </Trigger>
                             <Trigger Property="SortDirection" Value="Descending">
                                 <Setter TargetName="Descending" Property="Visibility" Value="Visible"/>
-                                <Setter Property="Foreground" Value="{StaticResource Text}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource Text}"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Foreground" Value="{StaticResource Text}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource Text}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -601,14 +680,14 @@
         </Style>
 
         <Style TargetType="DataGridRow">
-            <Setter Property="Background" Value="{StaticResource Base}"/>
-            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="Background" Value="{DynamicResource Base}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text}"/>
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="{StaticResource Surface0}"/>
+                    <Setter Property="Background" Value="{DynamicResource Surface0}"/>
                 </Trigger>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{StaticResource Mantle}"/>
+                    <Setter Property="Background" Value="{DynamicResource Mantle}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -616,7 +695,7 @@
         <Style TargetType="DataGridCell">
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="8,6"/>
-            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text}"/>
             <!-- WPF's stock focus visual is a dotted rectangle, and it only appears once
                  a key has been pressed — Esc cancelling a drag is enough to summon one
                  mid-grid. The row highlight already says which row is current. -->
@@ -643,9 +722,9 @@
              would arrive as a white card over a dark grid, so the whole thing is retemplated
              to the same card the column picker uses: Surface0 on a Surface1 hairline. -->
         <Style TargetType="ContextMenu">
-            <Setter Property="Background" Value="{StaticResource Surface0}"/>
-            <Setter Property="Foreground" Value="{StaticResource Text}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource Surface1}"/>
+            <Setter Property="Background" Value="{DynamicResource Surface0}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Surface1}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="3,5"/>
             <Setter Property="MinWidth" Value="150"/>
@@ -659,7 +738,7 @@
                         <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                CornerRadius="{DynamicResource RadMd}" Padding="{TemplateBinding Padding}">
                             <StackPanel IsItemsHost="True"
                                         KeyboardNavigation.DirectionalNavigation="Cycle"/>
                         </Border>
@@ -669,12 +748,12 @@
         </Style>
 
         <Style TargetType="MenuItem">
-            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text}"/>
             <Setter Property="Padding" Value="10,5"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="MenuItem">
-                        <Border x:Name="b" Background="Transparent" CornerRadius="3"
+                        <Border x:Name="b" Background="Transparent" CornerRadius="{DynamicResource RadSm}"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter ContentSource="Header" VerticalAlignment="Center"/>
                         </Border>
@@ -683,10 +762,10 @@
                                  moves as well, so arrowing through lights the same row. -->
                             <Trigger Property="IsHighlighted" Value="True">
                                 <Setter TargetName="b" Property="Background"
-                                        Value="{StaticResource Surface1}"/>
+                                        Value="{DynamicResource Surface1}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Foreground" Value="{StaticResource Overlay0}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource Overlay0}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -697,7 +776,7 @@
         <!-- Keyed to the menu's own separator key rather than TargetType, so this reaches
              separators inside menus and leaves any others alone. -->
         <Style x:Key="{x:Static MenuItem.SeparatorStyleKey}" TargetType="Separator">
-            <Setter Property="Background" Value="{StaticResource Surface1}"/>
+            <Setter Property="Background" Value="{DynamicResource Surface1}"/>
             <Setter Property="Margin" Value="8,4"/>
             <Setter Property="Template">
                 <Setter.Value>

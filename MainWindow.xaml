@@ -7,7 +7,7 @@
         mc:Ignorable="d"
         Title="SensVault" Height="640" Width="1180"
         MinWidth="330" MinHeight="240"
-        Background="{StaticResource Base}"
+        Background="{DynamicResource Base}"
         TextOptions.TextFormattingMode="Display"
         FontFamily="Segoe UI" FontSize="13"
         PreviewMouseDown="Window_PreviewMouseDown"
@@ -64,7 +64,7 @@
         </Grid.ColumnDefinitions>
 
         <!-- left: input panel -->
-        <Border x:Name="LeftPanel" Grid.Column="0" Background="{StaticResource Mantle}"
+        <Border x:Name="LeftPanel" Grid.Column="0" Background="{DynamicResource Mantle}"
                 Padding="16,14">
             <TabControl x:Name="Tabs" SelectionChanged="Tabs_SelectionChanged">
                 <!-- Rides in Tag so the TabControl template can place it just right of the
@@ -131,14 +131,14 @@
                                 </Grid.ColumnDefinitions>
                                 <Border Grid.Column="0" Height="1" Margin="0,0,10,0"
                                         VerticalAlignment="Center"
-                                        Background="{StaticResource Surface0}"/>
+                                        Background="{DynamicResource Surface0}"/>
                                 <TextBlock Grid.Column="1" Text="or" FontSize="12"
-                                           Foreground="{StaticResource Overlay0}"
+                                           Foreground="{DynamicResource Overlay0}"
                                            TextOptions.TextFormattingMode="Ideal"
                                            TextOptions.TextRenderingMode="ClearType"/>
                                 <Border Grid.Column="2" Height="1" Margin="10,0,0,0"
                                         VerticalAlignment="Center"
-                                        Background="{StaticResource Surface0}"/>
+                                        Background="{DynamicResource Surface0}"/>
                             </Grid>
 
                             <TextBlock Text="cm/360" Style="{StaticResource Label}" Margin="0,0,0,3"/>
@@ -154,7 +154,7 @@
                     <ScrollViewer x:Name="ConvertScroll" VerticalScrollBarVisibility="Auto"
                                   Margin="0,10,0,0">
                         <StackPanel>
-                            <TextBlock Foreground="{StaticResource Subtext}" TextWrapping="Wrap" FontSize="11"
+                            <TextBlock Foreground="{DynamicResource Subtext}" TextWrapping="Wrap" FontSize="11"
                                        Text="Convert a sensitivity to another game."/>
 
                             <TextBlock Text="From Profile" Style="{StaticResource Label}"/>
@@ -176,8 +176,8 @@
                                  is the one thing this tab exists to hand you. The cursor and
                                  tooltip are armed from RefreshConvert so they only appear when
                                  there is actually a result under them. -->
-                            <Border x:Name="ConvCard" Background="{StaticResource Surface0}"
-                                    CornerRadius="6" Padding="12,10" Margin="0,16,0,0"
+                            <Border x:Name="ConvCard" Background="{DynamicResource Surface0}"
+                                    CornerRadius="{DynamicResource RadCard}" Padding="12,10" Margin="0,16,0,0"
                                     MouseLeftButtonUp="ConvCard_Click">
                                 <StackPanel>
                                     <TextBlock Text="Converted Sensitivity" Style="{StaticResource Label}"
@@ -185,18 +185,18 @@
                                     <!-- Bottom-aligned rather than centred: the cm/360 is a
                                          footnote to the number, so it sits on its baseline. -->
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock x:Name="ConvResult" Foreground="{StaticResource Text}"
+                                        <TextBlock x:Name="ConvResult" Foreground="{DynamicResource Text}"
                                                    FontSize="26" FontWeight="Bold" Text="--"
                                                    VerticalAlignment="Bottom"/>
                                         <TextBlock x:Name="ConvDot" Text="&#183;" FontSize="18"
-                                                   Foreground="{StaticResource Overlay0}"
+                                                   Foreground="{DynamicResource Overlay0}"
                                                    Margin="9,0,9,1" VerticalAlignment="Bottom"
                                                    Visibility="Collapsed"/>
-                                        <TextBlock x:Name="ConvCm" Foreground="{StaticResource Subtext}"
+                                        <TextBlock x:Name="ConvCm" Foreground="{DynamicResource Subtext}"
                                                    FontSize="13" Margin="0,0,0,3"
                                                    VerticalAlignment="Bottom"/>
                                     </StackPanel>
-                                    <TextBlock x:Name="ConvDetail" Foreground="{StaticResource Subtext}"
+                                    <TextBlock x:Name="ConvDetail" Foreground="{DynamicResource Subtext}"
                                                FontSize="11" Margin="0,3,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </Border>
@@ -220,6 +220,7 @@
                              SelectionChanged="SettingsNav_SelectionChanged">
                         <ListBoxItem Content="General"/>
                         <ListBoxItem Content="Games"/>
+                        <ListBoxItem Content="Themes"/>
                     </ListBox>
                 </TabItem>
             </TabControl>
@@ -332,18 +333,18 @@
                         <!-- Shadow cast by a sibling behind the card, so the labels are not
                              inside an Effect subtree and do not get rasterised. -->
                         <Grid Margin="0,2,8,10">
-                            <Border Background="{StaticResource Surface0}" CornerRadius="4">
+                            <Border Background="{DynamicResource Surface0}" CornerRadius="{DynamicResource RadMd}">
                                 <Border.Effect>
                                     <DropShadowEffect BlurRadius="10" ShadowDepth="2"
                                                       Opacity="0.5" Color="#000000"/>
                                 </Border.Effect>
                             </Border>
-                            <Border Background="{StaticResource Surface0}"
-                                    BorderBrush="{StaticResource Surface1}" BorderThickness="1"
-                                    CornerRadius="4" Padding="3,5"
+                            <Border Background="{DynamicResource Surface0}"
+                                    BorderBrush="{DynamicResource Surface1}" BorderThickness="1"
+                                    CornerRadius="{DynamicResource RadMd}" Padding="3,5"
                                     TextOptions.TextFormattingMode="Ideal">
                             <StackPanel MinWidth="140">
-                                <TextBlock Text="COLUMNS" Foreground="{StaticResource Overlay0}"
+                                <TextBlock Text="COLUMNS" Foreground="{DynamicResource Overlay0}"
                                            FontSize="10" FontWeight="SemiBold" Margin="10,3,10,5"/>
                                 <CheckBox x:Name="ColName" Content="Name" Click="Column_Toggled"/>
                                 <CheckBox x:Name="ColGame" Content="Game" Click="Column_Toggled"/>
@@ -376,8 +377,8 @@
                 <DataGrid Grid.Column="0" x:Name="Grid_"
                           AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                           HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                          Background="{StaticResource Base}" BorderThickness="0"
-                          HorizontalGridLinesBrush="{StaticResource Surface0}"
+                          Background="{DynamicResource Base}" BorderThickness="0"
+                          HorizontalGridLinesBrush="{DynamicResource Surface0}"
                           HorizontalScrollBarVisibility="Auto"
                           RowHeight="34" SelectionMode="Extended"
                           VirtualizingPanel.VirtualizationMode="Standard"
@@ -445,7 +446,7 @@
                                             IsReadOnly="True" Width="96" MinWidth="82">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock" BasedOn="{StaticResource Copyable}">
-                                    <Setter Property="Foreground" Value="#FFFFFF"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
                                     <Setter Property="FontWeight" Value="SemiBold"/>
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
@@ -455,7 +456,7 @@
                                             IsReadOnly="True" Width="108" MinWidth="96">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock">
-                                    <Setter Property="Foreground" Value="{StaticResource Overlay0}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource Overlay0}"/>
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
@@ -486,14 +487,14 @@
 
                 <Border Grid.Row="1" x:Name="Toast" Opacity="0" IsHitTestVisible="False"
                         HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,20"
-                        Background="{StaticResource Surface1}" CornerRadius="16" Padding="16,8">
+                        Background="{DynamicResource Surface1}" CornerRadius="{DynamicResource RadPill}" Padding="16,8">
                     <Border.RenderTransform>
                         <TranslateTransform x:Name="ToastShift" Y="10"/>
                     </Border.RenderTransform>
                     <Border.Effect>
                         <DropShadowEffect BlurRadius="14" ShadowDepth="3" Opacity="0.55" Color="#000000"/>
                     </Border.Effect>
-                    <TextBlock x:Name="ToastText" Foreground="{StaticResource Text}" FontSize="12"/>
+                    <TextBlock x:Name="ToastText" Foreground="{DynamicResource Text}" FontSize="12"/>
                 </Border>
             </Grid>
 
@@ -509,9 +510,9 @@
 
                 <StackPanel Grid.Row="0">
                     <TextBlock x:Name="SettingsTitle" Text="General" FontSize="17"
-                               FontWeight="SemiBold" Foreground="{StaticResource Text}"/>
+                               FontWeight="SemiBold" Foreground="{DynamicResource Text}"/>
                     <TextBlock x:Name="SettingsBlurb" Text="Nothing here yet."
-                               FontSize="12" Foreground="{StaticResource Overlay0}"
+                               FontSize="12" Foreground="{DynamicResource Overlay0}"
                                Margin="0,8,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
 
@@ -520,21 +521,21 @@
                     <CheckBox x:Name="NoScrollBars" Content="Disable scrollbars"
                               Click="NoScrollBars_Click"/>
                     <TextBlock Text="Hides the scrollbars in the vault and the entry panel. The wheel still scrolls; only the bars go away."
-                               FontSize="12" Foreground="{StaticResource Overlay0}"
+                               FontSize="12" Foreground="{DynamicResource Overlay0}"
                                Margin="24,4,0,0" TextWrapping="Wrap" MaxWidth="420"
                                HorizontalAlignment="Left"/>
 
                     <CheckBox x:Name="NoStatusBar" Content="Hide the status bar"
                               Margin="0,10,0,0" Click="NoStatusBar_Click"/>
                     <TextBlock Text="Takes back the line under the vault. Warnings show up there too, so with it hidden a refused save says nothing at all."
-                               FontSize="12" Foreground="{StaticResource Overlay0}"
+                               FontSize="12" Foreground="{DynamicResource Overlay0}"
                                Margin="24,4,0,0" TextWrapping="Wrap" MaxWidth="420"
                                HorizontalAlignment="Left"/>
 
-                    <TextBlock Text="Data folder" Foreground="{StaticResource Text}"
+                    <TextBlock Text="Data folder" Foreground="{DynamicResource Text}"
                                FontWeight="SemiBold" Margin="0,22,0,0"/>
                     <TextBlock Text="Your saved sensitivities and any custom games both live in data.json in this folder. Close SensVault before editing it by hand -- it rewrites the file on exit, over whatever you changed."
-                               FontSize="12" Foreground="{StaticResource Overlay0}"
+                               FontSize="12" Foreground="{DynamicResource Overlay0}"
                                Margin="0,4,0,0" TextWrapping="Wrap" MaxWidth="420"
                                HorizontalAlignment="Left"/>
                     <!-- The path is selectable so it can be copied even if the folder
@@ -542,7 +543,7 @@
                          directory would otherwise leave nothing to go on. -->
                     <TextBox x:Name="DataPath" IsReadOnly="True" Margin="0,8,0,0"
                              MaxWidth="420" HorizontalAlignment="Left"
-                             FontSize="12" Foreground="{StaticResource Subtext}"/>
+                             FontSize="12" Foreground="{DynamicResource Subtext}"/>
                     <Button Content="Open data folder" Click="OpenDataFolder_Click"
                             Margin="0,8,0,0" Padding="14,7"
                             HorizontalAlignment="Left"/>
@@ -566,7 +567,7 @@
                     </Grid.RowDefinitions>
 
                     <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="12"
-                               Foreground="{StaticResource Overlay0}"
+                               Foreground="{DynamicResource Overlay0}"
                                Text="Untick a game to keep it out of the Add, Convert and in-vault pickers. Sensitivities you have already saved under it are not touched."/>
 
                     <Grid Grid.Row="1" Margin="0,12,0,0">
@@ -620,11 +621,103 @@
                     </ScrollViewer>
 
                     <TextBlock Grid.Row="3" x:Name="GameCount" Margin="7,8,0,0"
-                               FontSize="11" Foreground="{StaticResource Overlay0}"/>
+                               FontSize="11" Foreground="{DynamicResource Overlay0}"/>
+                </Grid>
+
+                <!-- Themes. Each swatch is painted in its own palette rather than the running
+                     one's, so the grid is the preview — there is nothing to apply and undo
+                     just to see what a theme looks like. ThemeCard holds those colours as
+                     frozen brushes for exactly that reason.
+
+                     Same two-row shape as Games and for the same reason: the list is longer
+                     than the window and has to be able to scroll. -->
+                <Grid Grid.Row="1" x:Name="ThemeSettings" Visibility="Collapsed"
+                      Margin="0,14,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="12" MaxWidth="420"
+                               HorizontalAlignment="Left"
+                               Foreground="{DynamicResource Overlay0}"
+                               Text="Pick a theme to apply it. The choice is saved with your vault, so it comes back next time."/>
+
+                    <ScrollViewer Grid.Row="1" x:Name="ThemeScroll" Margin="0,12,0,0"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl x:Name="ThemeList">
+                            <!-- Grouping puts a panel at each of two levels, and they are the
+                                 opposite way round to what the names suggest. GroupStyle.Panel
+                                 lays out the groups; ItemsPanel is what the ItemsPresenter
+                                 inside a group reaches for, so it lays out the swatches.
+
+                                 Getting it backwards is not a crash, just a quietly wrong
+                                 page: a horizontal WrapPanel over the groups turns the three
+                                 headings into three ragged columns. -->
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.GroupStyle>
+                                <GroupStyle>
+                                    <GroupStyle.Panel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel/>
+                                        </ItemsPanelTemplate>
+                                    </GroupStyle.Panel>
+                                    <GroupStyle.ContainerStyle>
+                                        <Style TargetType="GroupItem">
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="GroupItem">
+                                                        <StackPanel Margin="0,0,0,8">
+                                                            <TextBlock Text="{Binding Name}"
+                                                                       Style="{StaticResource Label}"
+                                                                       Margin="3,4,0,7"/>
+                                                            <ItemsPresenter/>
+                                                        </StackPanel>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </GroupStyle.ContainerStyle>
+                                </GroupStyle>
+                            </ItemsControl.GroupStyle>
+
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <!-- The ring is a sibling laid over the swatch rather than a
+                                         border on it. Growing the swatch's own border on select
+                                         would resize it and shuffle every chip after it along
+                                         the row; an overlay claims its space whether it is drawn
+                                         or not. Transparent fill so the whole tile takes clicks,
+                                         not just the text. -->
+                                    <Grid Margin="0,0,10,10" Background="Transparent"
+                                          Cursor="Hand" MouseLeftButtonUp="ThemeCard_Click">
+                                        <Border Width="158" Height="46" Margin="3"
+                                                Background="{Binding Back}"
+                                                BorderBrush="{Binding Edge}" BorderThickness="1"
+                                                CornerRadius="{Binding Radius}">
+                                            <TextBlock Text="{Binding Name}"
+                                                       Foreground="{Binding Fore}" FontSize="13"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                                        </Border>
+                                        <Border BorderBrush="{Binding Ring}" BorderThickness="2"
+                                                CornerRadius="{Binding RingRadius}"
+                                                Visibility="{Binding Selected,
+                                                             Converter={StaticResource BoolToVis}}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
                 </Grid>
             </Grid>
 
-            <TextBlock Grid.Row="1" x:Name="Status" Foreground="{StaticResource Overlay0}"
+            <TextBlock Grid.Row="1" x:Name="Status" Foreground="{DynamicResource Overlay0}"
                        FontSize="11" Margin="2,10,0,0"/>
         </Grid>
 

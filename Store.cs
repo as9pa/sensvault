@@ -53,6 +53,13 @@ public class AppData
     /// <summary>Whether the status line under the vault is folded away. It is also where
     /// warnings surface, so hiding it is a real trade and the settings page says so.</summary>
     public bool HideStatusBar { get; set; }
+
+    /// <summary>Applied theme, by name. Stored as the name for the same reason
+    /// <see cref="HiddenGames"/> is: the palettes are compiled in, and only the choice about
+    /// them belongs in the file. A name that no longer matches any theme falls back to the
+    /// default, so a renamed or dropped theme costs nothing. Empty is the default too, which
+    /// is what a file written before Settings &gt; Themes existed opens as.</summary>
+    public string Theme { get; set; } = "";
 }
 
 /// <summary>
