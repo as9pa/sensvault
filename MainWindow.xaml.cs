@@ -1215,6 +1215,13 @@ public partial class MainWindow : Window
         if (origin is null || !keep)
             return;
 
+        // A drop that stuck is a mutation like any other. The record's indices were taken
+        // against an order this drag has just changed, so they no longer point at the slots
+        // the rows came out of, and a Ctrl+Z afterwards would put them somewhere that means
+        // nothing. A cancelled drag never reaches here: it puts the row back first, which
+        // leaves the record describing the vault exactly as it did before the grab.
+        _undo = null;
+
         Renumber();
         var moved = origin.Value.Item;
         var label = string.IsNullOrWhiteSpace(moved.Name) ? moved.Label : $"\"{moved.Name}\"";
