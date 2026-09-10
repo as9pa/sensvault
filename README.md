@@ -18,3 +18,13 @@ requires windows x64.
 if you dont have dotnet download the `.exe`
 
 if you have dotnet download the `.zip`
+
+# build
+
+needs the .NET 10 SDK.
+
+    dotnet build
+    dotnet run
+
+release builds are made with `dotnet publish -c Release -r win-x64 -p:PublishSingleFile=true`,
+with `--self-contained true` for the `.exe` and `--self-contained false` for the `-dotnet.zip`.

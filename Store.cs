@@ -24,7 +24,7 @@ public class AppData
     public List<string> HiddenGames { get; set; } = [];
 
     /// <summary>Hand-ordered DPI presets. Nothing reads or writes these right now -- the
-    /// picker that used them is shelved in attic/ -- but the property stays so a saved list
+    /// picker that used them is shelved -- but the property stays so a saved list
     /// round-trips through the file untouched and survives until the feature comes back.</summary>
     public List<double> DpiPresets { get; set; } = [400, 800, 1600, 3200];
 

@@ -144,8 +144,8 @@
                  highlight. #8A8A8A at 45% composites to about #4E4E4E, which is a clear
                  jump while staying inside the palette's no-colour-cast rule.
 
-                 Deliberately not the Windows accent: this machine's is #393939, so matching
-                 the system would land right back on invisible.
+                 Deliberately not the Windows accent: a dark grey accent such as #393939 would
+                 land right back on invisible.
 
                  Every text box in the app inherits from here (the one inside the ComboBox
                  template and the grid's cell editor included), so this one setter covers

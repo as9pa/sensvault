@@ -11,11 +11,4 @@
     <Version>0.3.0</Version>
   </PropertyGroup>
 
-  <!-- Shelved code, kept readable but out of the build. See attic/README.md. -->
-  <ItemGroup>
-    <Compile Remove="attic/**" />
-    <Page Remove="attic/**" />
-    <None Include="attic/**" />
-  </ItemGroup>
-
 </Project>

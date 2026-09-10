@@ -8,3 +8,8 @@ publish/
 *.suo
 *.userprefs
 *.log
+
+.superpowers/
+.claude/
+.worktrees/
+.ruff_cache/
