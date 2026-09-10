@@ -65,7 +65,7 @@
 
         <!-- left: input panel -->
         <Border x:Name="LeftPanel" Grid.Column="0" Background="{DynamicResource Mantle}"
-                Padding="16,14">
+                Padding="16,16">
             <TabControl x:Name="Tabs" SelectionChanged="Tabs_SelectionChanged">
                 <!-- Rides in Tag so the TabControl template can place it just right of the
                      settings tab. See the header Grid in the TabControl style. -->
@@ -229,7 +229,7 @@
         </Border>
 
         <!-- right: the vault, or the settings detail for whatever the left list has picked -->
-        <Grid x:Name="VaultRoot" Grid.Column="1" Margin="16,16,16,16" UseLayoutRounding="True">
+        <Grid x:Name="VaultRoot" Grid.Column="1" Margin="16" UseLayoutRounding="True">
             <!-- Ctrl +/- zooms this side only; the entry panel keeps its size so the two
                  never fight for the window's width.
 

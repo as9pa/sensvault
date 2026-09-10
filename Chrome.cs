@@ -7,11 +7,13 @@ namespace SensVault;
 /// The interaction paint a control template asks for by name, held on the control rather than
 /// baked into the template.
 ///
-/// Every themeable template in App.xaml binds its hover wash, its pressed wash and its focus
-/// ring to these, so a style that wants different interaction colours -- a primary button, say
-/// -- sets three Setters and inherits the template unchanged. The alternative is copying a
-/// ControlTemplate per variant, and two copies of a template drift apart the first time one of
-/// them is fixed.
+/// The three button templates in App.xaml bind their hover and pressed washes to these, so a
+/// style that wants different interaction colours -- a primary button, say -- sets a couple of
+/// Setters and inherits the template unchanged. The alternative is copying a ControlTemplate
+/// per variant, and two copies of a template drift apart the first time one of them is fixed.
+///
+/// Focus is not here: it is a FocusVisualStyle, which WPF draws only for keyboard navigation
+/// and never for a click, so the ring a control wears is picked by swapping that style.
 ///
 /// The opacities are here because the washes are painted with palette brushes, which are
 /// shared and frozen: a variant that wants a 10% white sheen cannot dim the brush, only the
@@ -78,21 +80,6 @@ public static class Chrome
 
     public static void SetPressedOpacity(DependencyObject o, double value) =>
         o.SetValue(PressedOpacityProperty, value);
-
-    /// <summary>The 1px ring drawn while the control holds keyboard focus.</summary>
-    public static readonly DependencyProperty FocusBrushProperty =
-        DependencyProperty.RegisterAttached(
-            "FocusBrush",
-            typeof(Brush),
-            typeof(Chrome),
-            new PropertyMetadata(null)
-        );
-
-    public static Brush? GetFocusBrush(DependencyObject o) =>
-        (Brush?)o.GetValue(FocusBrushProperty);
-
-    public static void SetFocusBrush(DependencyObject o, Brush? value) =>
-        o.SetValue(FocusBrushProperty, value);
 
     /// <summary>Prompt shown in an empty field. Read by the text box templates.</summary>
     public static readonly DependencyProperty PlaceholderProperty =

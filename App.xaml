@@ -62,6 +62,42 @@
              when Windows has been told not to animate. -->
         <Duration x:Key="MotionDuration">0:0:0.12</Duration>
 
+        <!-- Focus, as a focus visual rather than as a trigger. WPF draws one of these only
+             while the keyboard is driving and skips it for a click, which is the distinction
+             an IsKeyboardFocused trigger cannot make: a button takes focus when you press it,
+             so a trigger leaves a ring on everything you have clicked lately. It also lands in
+             the adorner layer, above the control and outside its layout.
+
+             A Border rather than the usual Rectangle, because RadiusX and RadiusY are plain
+             doubles and cannot take RadMd: a Rectangle would ring a rounded button with a
+             square, and would keep its corners under the Classic themes, which square
+             everything else. -->
+        <Style x:Key="AccentFocusVisual" TargetType="Control">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Control">
+                        <Border BorderBrush="{DynamicResource Accent}" BorderThickness="1"
+                                CornerRadius="{DynamicResource RadMd}"
+                                Margin="-1" SnapsToDevicePixels="True"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- The same ring for a control whose own face is the accent, where the accent ring
+             would land on itself and disappear. -->
+        <Style x:Key="StrongFocusVisual" TargetType="Control">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Control">
+                        <Border BorderBrush="{DynamicResource TextStrong}" BorderThickness="1"
+                                CornerRadius="{DynamicResource RadMd}"
+                                Margin="-1" SnapsToDevicePixels="True"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Top-left and bottom-right of the bevel, as two layers: a Border paints all four
              edges with one brush, so a raised or sunken frame cannot be done in a single one.
              Raised puts BevelLight on TL, sunken swaps them. -->
@@ -86,7 +122,7 @@
         <Style x:Key="Label" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource Subtext}"/>
             <Setter Property="FontSize" Value="{StaticResource FontCaption}"/>
-            <Setter Property="Margin" Value="0,10,0,3"/>
+            <Setter Property="Margin" Value="0,12,0,4"/>
         </Style>
 
         <Style TargetType="TextBox">
@@ -381,32 +417,20 @@
         <Style TargetType="ComboBoxItem">
             <Setter Property="Foreground" Value="{DynamicResource Text}"/>
             <Setter Property="Padding" Value="8,6"/>
-            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AccentFocusVisual}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBoxItem">
-                        <Grid Margin="3,1">
-                            <Border x:Name="b" Background="Transparent" CornerRadius="{DynamicResource RadSm}"
-                                    Padding="{TemplateBinding Padding}">
-                                <ContentPresenter/>
-                            </Border>
-                            <!-- The ring is a sibling laid over the row, not a border on it.
-                                 A border that only exists while focused would grow the row by
-                                 2px every time the arrow keys landed on it, and the whole list
-                                 would twitch on the way past. -->
-                            <Border x:Name="focus" Visibility="Collapsed" IsHitTestVisible="False"
-                                    BorderThickness="1" BorderBrush="{DynamicResource Accent}"
-                                    CornerRadius="{DynamicResource RadSm}"/>
-                        </Grid>
+                        <Border x:Name="b" Background="Transparent" CornerRadius="{DynamicResource RadSm}" Margin="3,1"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter/>
+                        </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter TargetName="b" Property="Background" Value="{DynamicResource Surface1}"/>
                             </Trigger>
                             <Trigger Property="IsHighlighted" Value="True">
                                 <Setter TargetName="b" Property="Background" Value="{DynamicResource Surface1}"/>
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="focus" Property="Visibility" Value="Visible"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -417,31 +441,20 @@
         <Style TargetType="ListBoxItem">
             <Setter Property="Foreground" Value="{DynamicResource Text}"/>
             <Setter Property="Padding" Value="8,5"/>
-            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AccentFocusVisual}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <Grid Margin="2,1">
-                            <Border x:Name="b" Background="Transparent" CornerRadius="{DynamicResource RadSm}"
-                                    Padding="{TemplateBinding Padding}">
-                                <ContentPresenter/>
-                            </Border>
-                            <!-- Overlaid rather than grown, for the same reason as the combo
-                                 rows: the settings nav would jump a row each time it took
-                                 focus. -->
-                            <Border x:Name="focus" Visibility="Collapsed" IsHitTestVisible="False"
-                                    BorderThickness="1" BorderBrush="{DynamicResource Accent}"
-                                    CornerRadius="{DynamicResource RadSm}"/>
-                        </Grid>
+                        <Border x:Name="b" Background="Transparent" CornerRadius="{DynamicResource RadSm}" Margin="2,1"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter/>
+                        </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter TargetName="b" Property="Background" Value="{DynamicResource Surface1}"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="b" Property="Background" Value="{DynamicResource Surface1}"/>
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="focus" Property="Visibility" Value="Visible"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -458,16 +471,13 @@
             <Setter Property="Padding" Value="12,7"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <!-- The ring below replaces WPF's dotted rectangle, which is drawn outside the
-                 control and misses the rounded corners entirely. -->
-            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AccentFocusVisual}"/>
             <!-- Brighten, don't dim. Fading a dark button toward a dark panel reads as "going
                  away"; only a light button can dim on hover and still look pressed. Press then
                  goes the other way, one step below the resting face, because a button that
                  brightens further under the finger has nowhere left to go. -->
             <Setter Property="local:Chrome.HoverBrush" Value="{DynamicResource Surface3}"/>
             <Setter Property="local:Chrome.PressedBrush" Value="{DynamicResource Surface1}"/>
-            <Setter Property="local:Chrome.FocusBrush" Value="{DynamicResource Accent}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -500,11 +510,6 @@
                                                           Margin="{TemplateBinding Padding}"/>
                                     </Border>
                                 </Border>
-                                <!-- Laid over the face, so turning it on costs no layout: a
-                                     border grown on focus would nudge the label by a pixel. -->
-                                <Border x:Name="focus" Visibility="Collapsed" IsHitTestVisible="False"
-                                        BorderThickness="1" CornerRadius="{DynamicResource RadLg}"
-                                        BorderBrush="{TemplateBinding local:Chrome.FocusBrush}"/>
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -541,9 +546,6 @@
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="press" Property="Visibility" Value="Visible"/>
                             </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="focus" Property="Visibility" Value="Visible"/>
-                            </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="b" Property="Opacity" Value="0.4"/>
                             </Trigger>
@@ -559,12 +561,11 @@
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{DynamicResource Overlay0}"/>
             <Setter Property="Padding" Value="6,4"/>
-            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AccentFocusVisual}"/>
             <!-- A glyph button starts from nothing, so its washes are the two quietest steps
                  on the ramp rather than the two the commit button uses. -->
             <Setter Property="local:Chrome.HoverBrush" Value="{DynamicResource Surface1}"/>
             <Setter Property="local:Chrome.PressedBrush" Value="{DynamicResource Surface2}"/>
-            <Setter Property="local:Chrome.FocusBrush" Value="{DynamicResource Accent}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -582,9 +583,6 @@
                                         Background="{TemplateBinding local:Chrome.PressedBrush}"/>
                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
                                                   Margin="{TemplateBinding Padding}"/>
-                                <Border x:Name="focus" Visibility="Collapsed" IsHitTestVisible="False"
-                                        BorderThickness="1" CornerRadius="{DynamicResource RadMd}"
-                                        BorderBrush="{TemplateBinding local:Chrome.FocusBrush}"/>
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -621,9 +619,6 @@
                                 <Setter TargetName="press" Property="Visibility" Value="Visible"/>
                                 <Setter Property="Foreground" Value="{DynamicResource Text}"/>
                             </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="focus" Property="Visibility" Value="Visible"/>
-                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -635,10 +630,13 @@
             <Setter Property="Foreground" Value="{DynamicResource Overlay0}"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Focusable" Value="False"/>
-            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-            <Setter Property="local:Chrome.HoverBrush" Value="{DynamicResource Surface1}"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AccentFocusVisual}"/>
+            <!-- Unchecked, the wash is the face's own colour and the hover reads off the
+                 border and the glyph instead: Surface1 is what checked looks like, and
+                 hovering an empty toggle should not make it look ticked. Checked swaps the
+                 wash for a step above itself, in the trigger below. -->
+            <Setter Property="local:Chrome.HoverBrush" Value="{DynamicResource Surface0}"/>
             <Setter Property="local:Chrome.PressedBrush" Value="{DynamicResource Surface2}"/>
-            <Setter Property="local:Chrome.FocusBrush" Value="{DynamicResource Accent}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
@@ -665,9 +663,6 @@
                                                           VerticalAlignment="Center"/>
                                     </Border>
                                 </Border>
-                                <Border x:Name="focus" Visibility="Collapsed" IsHitTestVisible="False"
-                                        BorderThickness="1" CornerRadius="{DynamicResource RadMd}"
-                                        BorderBrush="{TemplateBinding local:Chrome.FocusBrush}"/>
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -705,14 +700,13 @@
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="press" Property="Visibility" Value="Visible"/>
                             </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="focus" Property="Visibility" Value="Visible"/>
-                            </Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="b" Property="Background"
                                         Value="{DynamicResource Surface1}"/>
                                 <Setter TargetName="b" Property="BorderBrush"
                                         Value="{DynamicResource Overlay0}"/>
+                                <Setter TargetName="hover" Property="Background"
+                                        Value="{DynamicResource Surface2}"/>
                                 <Setter Property="Foreground" Value="{DynamicResource Text}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -726,7 +720,7 @@
             <Setter Property="Foreground" Value="{DynamicResource Text}"/>
             <Setter Property="FontSize" Value="{StaticResource FontSecondary}"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AccentFocusVisual}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
@@ -769,13 +763,6 @@
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="box" Property="BorderBrush"
                                         Value="{DynamicResource Text}"/>
-                            </Trigger>
-                            <!-- The box is the only thing here worth ringing, and it already
-                                 carries a 1px edge: the accent goes on that rather than round
-                                 the whole row, which would trace the label as well. -->
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="box" Property="BorderBrush"
-                                        Value="{DynamicResource Accent}"/>
                             </Trigger>
                             <!-- The last visible column disables its own box rather than
                                  vanishing, so it stays obvious *why* it will not turn off. -->
@@ -828,21 +815,14 @@
 
         <Style TargetType="TabItem">
             <Setter Property="Foreground" Value="{DynamicResource Overlay0}"/>
-            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AccentFocusVisual}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
-                        <Grid Margin="0,0,4,0">
-                            <Border x:Name="b" Background="Transparent" Padding="14,8"
-                                    CornerRadius="{DynamicResource RadLg}">
-                                <ContentPresenter ContentSource="Header"/>
-                            </Border>
-                            <!-- Over the pill rather than on it: the strip is the one place a
-                                 tab growing by 2px would push every other tab along. -->
-                            <Border x:Name="focus" Visibility="Collapsed" IsHitTestVisible="False"
-                                    BorderThickness="1" BorderBrush="{DynamicResource Accent}"
-                                    CornerRadius="{DynamicResource RadLg}"/>
-                        </Grid>
+                        <Border x:Name="b" Background="Transparent" Padding="14,8" Margin="0,0,4,0"
+                                CornerRadius="{DynamicResource RadLg}">
+                            <ContentPresenter ContentSource="Header"/>
+                        </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter TargetName="b" Property="Background" Value="{DynamicResource Surface0}"/>
@@ -858,9 +838,6 @@
                                 </MultiTrigger.Conditions>
                                 <Setter Property="Foreground" Value="{DynamicResource Subtext}"/>
                             </MultiTrigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="focus" Property="Visibility" Value="Visible"/>
-                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
