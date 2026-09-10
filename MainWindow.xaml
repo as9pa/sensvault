@@ -152,10 +152,17 @@
                                      12px glyph drawn in 1.6px lines the pointer misses more
                                      often than it hits; a transparent Border takes the hit
                                      across its whole face, and the padding widens that face
-                                     past the ink. No margin of its own: the hairlines either
-                                     side already carry the 8px the word "or" stood in. -->
+                                     past the ink.
+
+                                     The margin is the padding back out again. Padding alone
+                                     would make this 20x20 in layout too, which would push the
+                                     hairlines out to a 12px gap and grow the row by 8. At -4
+                                     the Border asks for the glyph's own 12x12 and overhangs
+                                     into the margins the hairlines already keep, so the hit
+                                     area is 20x20 while the divider looks exactly as it did
+                                     with the word "or" in the middle of it. -->
                                 <Border Grid.Column="1" Background="Transparent" Padding="4"
-                                        ToolTip="Kept in sync">
+                                        Margin="-4" ToolTip="Kept in sync">
                                     <Path Data="{StaticResource SyncIcon}"
                                           Width="12" Height="12" Stretch="Uniform"
                                           Stroke="{DynamicResource Overlay0}" StrokeThickness="1.6"
