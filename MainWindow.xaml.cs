@@ -732,6 +732,10 @@ public partial class MainWindow : Window
         if (Rows.Parent<ScrollBar>(origin) is not null)
             return;
 
+        // Reaching for the toast's Undo is not a change of mind about what is selected.
+        if (origin is Visual clicked && Toast.IsAncestorOf(clicked))
+            return;
+
         if (Grid_.SelectedItems.Count == 0)
             return;
 
