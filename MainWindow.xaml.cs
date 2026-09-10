@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Reflection;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -141,6 +142,13 @@ public partial class MainWindow : Window
         NoStatusBar.IsChecked = _data.HideStatusBar;
         ApplyStatusBar();
         DataPath.Text = Store.Folder;
+
+        // Read off the assembly rather than written into the XAML: the csproj's <Version> is
+        // the one place the number is kept, and a second copy here would go stale the first
+        // time it was bumped. Revision is left off; nothing sets it.
+        var version = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0);
+        VersionLine.Text = $"SensVault {version.Major}.{version.Minor}.{version.Build}";
+
         ShowSettingsPage();
         ApplyDirectMode();
         UpdateCmPlaceholder();
@@ -1741,6 +1749,7 @@ public partial class MainWindow : Window
         if (
             SettingsTitle is null
             || SettingsBlurb is null
+            || ThemeCurrentName is null
             || GeneralSettings is null
             || GamesSettings is null
             || ThemeSettings is null
@@ -1756,6 +1765,9 @@ public partial class MainWindow : Window
         GeneralSettings.Visibility = general ? Visibility.Visible : Visibility.Collapsed;
         GamesSettings.Visibility = games ? Visibility.Visible : Visibility.Collapsed;
         ThemeSettings.Visibility = themes ? Visibility.Visible : Visibility.Collapsed;
+
+        // Only the Themes page has a current theme worth naming in the header.
+        ThemeCurrentName.Visibility = themes ? Visibility.Visible : Visibility.Collapsed;
 
         // The blurb is the placeholder for a page with no controls yet; a page that has some
         // does not need to be told it is empty.
@@ -1854,6 +1866,12 @@ public partial class MainWindow : Window
 
         foreach (var card in _themes)
             card.Selected = ReferenceEquals(card.Theme, theme);
+
+        // Guarded for the same reason ShowSettingsPage is: the first call comes out of the
+        // constructor, and the header this writes to is built by the XAML rather than owned
+        // by the theme code.
+        if (ThemeCurrentName is not null)
+            ThemeCurrentName.Text = theme.Name;
 
         // No-op until the window has a handle; the SourceInitialized hook covers the first
         // call, and every later one comes through here.

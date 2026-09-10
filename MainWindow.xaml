@@ -126,6 +126,45 @@
             <Setter Property="Typography.NumeralAlignment" Value="Tabular"/>
         </Style>
 
+        <!-- The settings nav, and only it: keyed and hung on that one ListBox rather
+             than laid over every list in the app. This is the list whose selection says
+             which page you are looking at, and a fill on its own is something you have to
+             go looking for. The bar is at the item's leading edge, 2px wide whether it is
+             drawn or not, so nothing shifts as the pick moves down the column.
+
+             The fill and the hover are the ones the default item style paints, restated
+             here because a template replaces the triggers along with the visual tree. -->
+        <Style x:Key="SettingsNavItem" TargetType="ListBoxItem"
+               BasedOn="{StaticResource {x:Type ListBoxItem}}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="b" Background="Transparent" Margin="2,1"
+                                CornerRadius="{DynamicResource RadSm}">
+                            <Border x:Name="marker" BorderBrush="Transparent"
+                                    BorderThickness="2,0,0,0"
+                                    CornerRadius="{DynamicResource RadSm}"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter/>
+                            </Border>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="b" Property="Background"
+                                        Value="{DynamicResource Surface1}"/>
+                                <Setter TargetName="marker" Property="BorderBrush"
+                                        Value="{DynamicResource Accent}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="b" Property="Background"
+                                        Value="{DynamicResource Surface1}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Cells you can click to copy. Both the sens and the cm/360 carry it, so the
              cursor and tooltip are declared once. Both hold numbers as well, which is what
              the figures above are inherited for. -->
@@ -467,13 +506,23 @@
                               Fill="{Binding Foreground,
                                      RelativeSource={RelativeSource AncestorType=TabItem}}"/>
                     </TabItem.Header>
-                    <ListBox x:Name="SettingsNav" Margin="0,12,0,0" SelectedIndex="0"
-                             Background="Transparent" BorderThickness="0"
-                             SelectionChanged="SettingsNav_SelectionChanged">
-                        <ListBoxItem Content="General"/>
-                        <ListBoxItem Content="Games"/>
-                        <ListBoxItem Content="Themes"/>
-                    </ListBox>
+                    <!-- The nav takes the column and the version line sits under it, so
+                         the line is at the foot of the panel whatever height the window is
+                         at. In a StackPanel it would follow the third item and hang in the
+                         middle of an empty column. -->
+                    <DockPanel Margin="0,12,0,0">
+                        <TextBlock x:Name="VersionLine" DockPanel.Dock="Bottom"
+                                   FontSize="{StaticResource FontCaption}"
+                                   Foreground="{DynamicResource Overlay0}" Margin="8,0,0,0"/>
+                        <ListBox x:Name="SettingsNav" SelectedIndex="0"
+                                 Background="Transparent" BorderThickness="0"
+                                 ItemContainerStyle="{StaticResource SettingsNavItem}"
+                                 SelectionChanged="SettingsNav_SelectionChanged">
+                            <ListBoxItem Content="General"/>
+                            <ListBoxItem Content="Games"/>
+                            <ListBoxItem Content="Themes"/>
+                        </ListBox>
+                    </DockPanel>
                 </TabItem>
             </TabControl>
         </Border>
@@ -839,30 +888,76 @@
                 </Grid.RowDefinitions>
 
                 <StackPanel Grid.Row="0">
-                    <TextBlock x:Name="SettingsTitle" Text="General" FontSize="{StaticResource FontTitle}"
-                               FontWeight="SemiBold" Foreground="{DynamicResource Text}"/>
+                    <!-- The page, and on Themes the name of the one that is applied. The
+                         ring is easy to lose among seventeen swatches that all look
+                         plausible, so the running theme is said once in words as well. -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="SettingsTitle" Text="General" FontSize="{StaticResource FontTitle}"
+                                   FontWeight="SemiBold" Foreground="{DynamicResource Text}"/>
+                        <TextBlock Grid.Column="1" x:Name="ThemeCurrentName" Visibility="Collapsed"
+                                   FontSize="{StaticResource FontSecondary}"
+                                   Foreground="{DynamicResource Accent}"
+                                   VerticalAlignment="Bottom"/>
+                    </Grid>
                     <TextBlock x:Name="SettingsBlurb" Text="Nothing here yet."
                                FontSize="{StaticResource FontSecondary}" Foreground="{DynamicResource Overlay0}"
                                Margin="0,8,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
 
                 <StackPanel Grid.Row="1" x:Name="GeneralSettings" Visibility="Collapsed"
-                            Margin="0,16,0,0" VerticalAlignment="Top">
-                    <CheckBox x:Name="NoScrollBars" Content="Disable scrollbars"
-                              Click="NoScrollBars_Click"/>
-                    <TextBlock Text="Hides the scrollbars in the vault and the entry panel. The wheel still scrolls; only the bars go away."
-                               FontSize="{StaticResource FontSecondary}" Foreground="{DynamicResource Overlay0}"
-                               Margin="24,4,0,0" TextWrapping="Wrap" MaxWidth="420"
-                               HorizontalAlignment="Left"/>
+                            Margin="0,16,0,0" MaxWidth="560" HorizontalAlignment="Left"
+                            VerticalAlignment="Top">
+                    <!-- Rows rather than tick boxes. Both of these are states the window
+                         is already in rather than instructions waiting to be carried out,
+                         and both land on the click: the setting is the line you read, what
+                         it costs is the line under it, and the switch on the right is the
+                         part that says which way it is set. -->
+                    <Grid Margin="0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Disable scrollbars" FontSize="{StaticResource FontBody}"
+                                       Foreground="{DynamicResource Text}"/>
+                            <TextBlock Text="Hides the scrollbars in the vault and the entry panel. The wheel still scrolls; only the bars go away."
+                                       FontSize="{StaticResource FontSecondary}" Foreground="{DynamicResource Subtext}"
+                                       Margin="0,2,0,0" TextWrapping="Wrap" MaxWidth="440"
+                                       HorizontalAlignment="Left"/>
+                        </StackPanel>
+                        <CheckBox Grid.Column="1" x:Name="NoScrollBars" Style="{StaticResource Switch}"
+                                  VerticalAlignment="Center" Margin="16,0,0,0"
+                                  Click="NoScrollBars_Click"/>
+                    </Grid>
 
-                    <CheckBox x:Name="NoStatusBar" Content="Hide the status bar"
-                              Margin="0,8,0,0" Click="NoStatusBar_Click"/>
-                    <TextBlock Text="Takes back the line under the vault."
-                               FontSize="{StaticResource FontSecondary}" Foreground="{DynamicResource Overlay0}"
-                               Margin="24,4,0,0" TextWrapping="Wrap" MaxWidth="420"
-                               HorizontalAlignment="Left"/>
+                    <!-- Between the two and nowhere else. A line above the first or below
+                         the last draws a box round settings that are not a group. -->
+                    <Border Height="1" Background="{DynamicResource Surface0}"/>
+
+                    <Grid Margin="0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Hide the status bar" FontSize="{StaticResource FontBody}"
+                                       Foreground="{DynamicResource Text}"/>
+                            <TextBlock Text="Takes back the line under the vault."
+                                       FontSize="{StaticResource FontSecondary}" Foreground="{DynamicResource Subtext}"
+                                       Margin="0,2,0,0" TextWrapping="Wrap" MaxWidth="440"
+                                       HorizontalAlignment="Left"/>
+                        </StackPanel>
+                        <CheckBox Grid.Column="1" x:Name="NoStatusBar" Style="{StaticResource Switch}"
+                                  VerticalAlignment="Center" Margin="16,0,0,0"
+                                  Click="NoStatusBar_Click"/>
+                    </Grid>
 
                     <TextBlock Text="Data folder" Foreground="{DynamicResource Text}"
+                               FontSize="{StaticResource FontBody}"
                                FontWeight="SemiBold" Margin="0,24,0,0"/>
                     <TextBlock Text="Your saved sensitivities and any custom games both live in data.json in this folder. Close SensVault before editing it by hand -- it rewrites the file on exit, over whatever you changed."
                                FontSize="{StaticResource FontSecondary}" Foreground="{DynamicResource Overlay0}"
@@ -871,12 +966,16 @@
                     <!-- The path is selectable so it can be copied even if the folder
                          cannot be opened. A machine with no shell association for a
                          directory would otherwise leave nothing to go on. -->
-                    <TextBox x:Name="DataPath" IsReadOnly="True" Margin="0,8,0,0"
-                             MaxWidth="420" HorizontalAlignment="Left"
-                             FontSize="{StaticResource FontSecondary}" Foreground="{DynamicResource Subtext}"/>
-                    <Button Content="Open data folder" Click="OpenDataFolder_Click"
-                            Margin="0,8,0,0" Padding="14,7"
-                            HorizontalAlignment="Left"/>
+                    <Grid Margin="0,8,0,0" MaxWidth="560" HorizontalAlignment="Left">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" x:Name="DataPath" IsReadOnly="True"
+                                 FontSize="{StaticResource FontSecondary}" Foreground="{DynamicResource Subtext}"/>
+                        <Button Grid.Column="1" Content="Open data folder" Click="OpenDataFolder_Click"
+                                Margin="8,0,0,0" Padding="14,7"/>
+                    </Grid>
                 </StackPanel>
 
                 <!-- Games. The library is compiled into the app, so unticking here is the
@@ -888,37 +987,49 @@
                      the library still offering that game; it just cannot be re-picked from a
                      drop-down until the game is ticked back on. -->
                 <Grid Grid.Row="1" x:Name="GamesSettings" Visibility="Collapsed"
-                      Margin="0,16,0,0" MaxWidth="420" HorizontalAlignment="Left">
+                      Margin="0,16,0,0" MaxWidth="640" HorizontalAlignment="Left">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="{StaticResource FontSecondary}"
                                Foreground="{DynamicResource Overlay0}"
+                               MaxWidth="420" HorizontalAlignment="Left"
                                Text="Untick a game to keep it out of the Add, Convert and in-vault pickers. Sensitivities you have already saved under it are not touched."/>
 
+                    <!-- Everything that acts on the list, and the one number that says
+                         what the list is currently showing, on the strip above it. The
+                         count is at the far end of the same line rather than under the
+                         list, where it was a footnote to a column of ticks. -->
                     <Grid Grid.Row="1" Margin="0,12,0,0">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <TextBox Grid.Column="0" x:Name="GameSearch"
-                                 TextChanged="GameSearch_TextChanged"
-                                 ToolTip="Narrow the list by name"/>
+                        <!-- The prompt in the box is what the tooltip used to say, and it is
+                             there before the mouse rather than a second after it. -->
+                        <TextBox Grid.Column="0" x:Name="GameSearch" Width="240"
+                                 Style="{StaticResource SearchBox}"
+                                 local:Chrome.Placeholder="Filter games"
+                                 TextChanged="GameSearch_TextChanged"/>
                         <!-- Both buttons act on what the search has left showing, not on the
                              whole library: with "counter" typed, None is how you drop the
                              five Counter-Strikes in one go without touching anything else. -->
-                        <Button Grid.Column="1" Content="All" Click="ShowAllGames_Click"
-                                Margin="8,0,0,0" Padding="12,7" MinWidth="52"
+                        <Button Grid.Column="1" Content="All" Style="{StaticResource QuietButton}"
+                                Click="ShowAllGames_Click" Margin="8,0,0,0" MinWidth="52"
                                 ToolTip="Tick everything currently listed"/>
-                        <Button Grid.Column="2" Content="None" Click="HideAllGames_Click"
-                                Margin="4,0,0,0" Padding="12,7" MinWidth="52"
+                        <Button Grid.Column="2" Content="None" Style="{StaticResource QuietButton}"
+                                Click="HideAllGames_Click" Margin="4,0,0,0" MinWidth="52"
                                 ToolTip="Untick everything currently listed"/>
+                        <TextBlock Grid.Column="4" x:Name="GameCount" Margin="8,0,0,0"
+                                   HorizontalAlignment="Right" VerticalAlignment="Center"
+                                   FontSize="{StaticResource FontCaption}" Foreground="{DynamicResource Overlay0}"/>
                     </Grid>
 
                     <!-- ItemsControl rather than ListBox: there is nothing to select here.
@@ -939,9 +1050,20 @@
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled">
                         <ItemsControl x:Name="GameList">
+                            <!-- Two columns, filled along the rows, which halves how far the
+                                 library scrolls. A WrapPanel rather than a UniformGrid, and
+                                 the width on the item rather than on the panel: both of the
+                                 other ways reserve a slot per item, and a game the search
+                                 has collapsed would hold an empty one open. -->
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" MaxWidth="640"
+                                               HorizontalAlignment="Left"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <CheckBox Content="{Binding Name}"
+                                    <CheckBox Width="300" Content="{Binding Name}"
                                               IsChecked="{Binding Shown}"
                                               Visibility="{Binding Matches,
                                                            Converter={StaticResource BoolToVis}}"/>
@@ -949,9 +1071,6 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </ScrollViewer>
-
-                    <TextBlock Grid.Row="3" x:Name="GameCount" Margin="8,8,0,0"
-                               FontSize="{StaticResource FontCaption}" Foreground="{DynamicResource Overlay0}"/>
                 </Grid>
 
                 <!-- Themes. Each swatch is painted in its own palette rather than the running
@@ -1027,14 +1146,61 @@
                                          not just the text. -->
                                     <Grid Margin="0,0,8,8" Background="Transparent"
                                           Cursor="Hand" MouseLeftButtonUp="ThemeCard_Click">
-                                        <Border Width="158" Height="46" Margin="4"
+                                        <!-- A name on a background says what the page is
+                                             made of and nothing about what the app will
+                                             look like. The band is the left panel, the
+                                             three pips are the accent, a button and a
+                                             field: the four surfaces a window is mostly
+                                             built from, in the proportions it uses them.
+
+                                             Clipped, because the band and the pips are
+                                             drawn to the card's edges and a rounded corner
+                                             would otherwise leave them poking out of it. -->
+                                        <Border Width="158" Height="64" Margin="4"
                                                 Background="{Binding Back}"
-                                                BorderBrush="{Binding Edge}" BorderThickness="1"
-                                                CornerRadius="{Binding Radius}">
-                                            <TextBlock Text="{Binding Name}"
-                                                       Foreground="{Binding Fore}" FontSize="{StaticResource FontBody}"
-                                                       HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center"/>
+                                                BorderBrush="{Binding Hairline}" BorderThickness="1"
+                                                CornerRadius="{Binding Radius}"
+                                                ClipToBounds="True">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="6"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Border Grid.Column="0" Background="{Binding Band}"/>
+                                                <Grid Grid.Column="1" Margin="8,8,10,8">
+                                                    <!-- The tick's width is held clear of
+                                                         the name whether it is drawn or
+                                                         not, so a long name trims rather
+                                                         than running under it. -->
+                                                    <TextBlock Text="{Binding Name}"
+                                                               Foreground="{Binding Fore}"
+                                                               FontSize="{StaticResource FontBody}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               Margin="0,0,13,0"
+                                                               VerticalAlignment="Top"/>
+                                                    <Path Data="{StaticResource CheckIcon}"
+                                                          Width="11" Height="11" Stretch="Uniform"
+                                                          Stroke="{Binding AccentBrush}" StrokeThickness="1.8"
+                                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                                          StrokeLineJoin="Round"
+                                                          HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                          Visibility="{Binding Selected,
+                                                                       Converter={StaticResource BoolToVis}}"/>
+                                                    <StackPanel Orientation="Horizontal"
+                                                                VerticalAlignment="Bottom">
+                                                        <Ellipse Width="10" Height="10" Margin="0,0,6,0"
+                                                                 Fill="{Binding AccentBrush}"/>
+                                                        <Border Width="30" Height="10" Margin="0,0,6,0"
+                                                                Background="{Binding PipMid}"
+                                                                CornerRadius="{DynamicResource RadSm}"/>
+                                                        <Border Width="22" Height="10"
+                                                                Background="{Binding PipLow}"
+                                                                BorderBrush="{Binding Hairline}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="{DynamicResource RadSm}"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Grid>
                                         </Border>
                                         <Border BorderBrush="{Binding Ring}" BorderThickness="2"
                                                 CornerRadius="{Binding RingRadius}"

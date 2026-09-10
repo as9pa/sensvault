@@ -211,6 +211,25 @@ public sealed class ThemeCard : INotifyPropertyChanged
     public Brush Edge => _edge ??= Frozen(Theme.Surface3);
     public Brush Ring => _ring ??= Frozen(Theme.Accent);
 
+    /// <summary>The band down the left of the swatch. Mantle is what the app paints its left
+    /// panel and its grid header in, so the band is the stripe the window itself wears.</summary>
+    public Brush Band => _band ??= Frozen(Theme.Mantle);
+
+    /// <summary>The swatch's own edge, and the outline on the quietest pip. Surface1 is the
+    /// hairline the running app draws its fields and its separators with.</summary>
+    public Brush Hairline => _hairline ??= Frozen(Theme.Surface1);
+
+    /// <summary>The accent, for the first pip and for the tick the applied swatch wears. The
+    /// same brush as <see cref="Ring"/>: a theme has one accent, and one swatch shows it in
+    /// three places.</summary>
+    public Brush AccentBrush => Ring;
+
+    /// <summary>A button's face, as the middle pip.</summary>
+    public Brush PipMid => _pipMid ??= Frozen(Theme.Surface2);
+
+    /// <summary>A field's face, as the last pip.</summary>
+    public Brush PipLow => _pipLow ??= Frozen(Theme.Surface0);
+
     /// <summary>Square for the Classic pair, matching what picking them does to the app.</summary>
     public CornerRadius Radius => new(Theme.Square ? 0 : 8);
 
@@ -222,6 +241,10 @@ public sealed class ThemeCard : INotifyPropertyChanged
     private Brush? _fore;
     private Brush? _edge;
     private Brush? _ring;
+    private Brush? _band;
+    private Brush? _hairline;
+    private Brush? _pipMid;
+    private Brush? _pipLow;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

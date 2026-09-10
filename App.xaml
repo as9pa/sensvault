@@ -126,6 +126,8 @@
         <!-- Two sheets, the front one over the back, for the cells that copy on a click. -->
         <Geometry x:Key="CopyIcon">M6,6 H13 V13 H6 Z M3,10 V3 H10</Geometry>
         <Geometry x:Key="SearchIcon">M7,2.5 a4.5,4.5 0 1 0 0,9 a4.5,4.5 0 0 0 0,-9 Z M10.3,10.3 L14,14</Geometry>
+        <!-- A tick, for the theme swatch that is the one applied. -->
+        <Geometry x:Key="CheckIcon">M3,8.5 L6.5,12 L13,4.5</Geometry>
 
         <Style x:Key="Label" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource Subtext}"/>
@@ -736,6 +738,22 @@
             </Setter>
         </Style>
 
+        <!-- The two bulk commands on the games checklist. They act on the list beside
+             them rather than on the page, and two filled faces next to the search box would
+             read as the thing to do here; the label is the whole button and a face only
+             turns up under the mouse.
+
+             Setters only. The default template binds its washes to Chrome, so a quiet
+             button is a retint of that template rather than a fourth copy of it. -->
+        <Style x:Key="QuietButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource Subtext}"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="local:Chrome.HoverBrush" Value="{DynamicResource Surface1}"/>
+            <Setter Property="local:Chrome.PressedBrush" Value="{DynamicResource Surface2}"/>
+        </Style>
+
         <!-- Framed toggle for the column picker: reads as an input, not a command. -->
         <Style x:Key="IconToggle" TargetType="ToggleButton">
             <Setter Property="Foreground" Value="{DynamicResource Overlay0}"/>
@@ -880,6 +898,103 @@
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.45"/>
                                 <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- A preference that takes effect the moment it is thrown, for the General page.
+             A tick box says "I have marked this, now go"; a switch says the thing is on
+             already, which is what a setting that repaints the window as you click it is.
+
+             It draws no label. A row on that page is a title and a sentence saying what the
+             setting costs, and both are set beside the switch rather than inside it, so
+             Content is left alone for the row to place.
+
+             The knob slides rather than jumping. It is the one moving part on the page and
+             the travel is what says which way the setting just went. MotionDuration is zero
+             when Windows has been asked for no animation, and a zero-length animation lands
+             on its To value at once. -->
+        <Style x:Key="Switch" TargetType="CheckBox">
+            <Setter Property="Cursor" Value="Hand"/>
+            <!-- The keyboard ring is drawn on the track below. The shared adorner sits
+                 outside the control, and the two together read as a switch in a box. -->
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <!-- The edge is 1px whatever happens and only transparent until the
+                             keyboard arrives: a track that grew a border on focus would
+                             squeeze the knob by a pixel as it landed. -->
+                        <Border x:Name="track" Width="32" Height="18"
+                                Background="{DynamicResource Surface2}"
+                                BorderBrush="Transparent" BorderThickness="1"
+                                CornerRadius="{DynamicResource RadPill}">
+                            <!-- Named, which is what keeps it out of the frozen objects a
+                                 template is otherwise built from: a frozen transform cannot
+                                 be animated. -->
+                            <Ellipse x:Name="knob" Width="12" Height="12"
+                                     Fill="{DynamicResource Subtext}"
+                                     Margin="2,0,0,0"
+                                     HorizontalAlignment="Left" VerticalAlignment="Center">
+                                <Ellipse.RenderTransform>
+                                    <TranslateTransform x:Name="slide"/>
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="track" Property="Background"
+                                        Value="{DynamicResource Accent}"/>
+                                <Setter TargetName="knob" Property="Fill"
+                                        Value="{DynamicResource AccentText}"/>
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="slide"
+                                                             Storyboard.TargetProperty="X" To="14"
+                                                             Duration="{StaticResource MotionDuration}">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="slide"
+                                                             Storyboard.TargetProperty="X" To="0"
+                                                             Duration="{StaticResource MotionDuration}">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="track" Property="BorderBrush"
+                                        Value="{DynamicResource Accent}"/>
+                            </Trigger>
+                            <!-- An accent edge on an accent track is not there at all, so a
+                                 switch that is on borrows the ink its own knob is painted
+                                 in. Declared after the plain focus trigger, which is what
+                                 lets it win over it. -->
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsChecked" Value="True"/>
+                                    <Condition Property="IsKeyboardFocused" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="track" Property="BorderBrush"
+                                        Value="{DynamicResource AccentText}"/>
+                            </MultiTrigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
