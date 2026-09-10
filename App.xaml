@@ -1035,16 +1035,80 @@
              MultiTrigger is what stops a selected row you happen to be over from dropping
              back down to the hover colour.
 
-             Every row carries the border and paints it with nothing. Turning a border on at
-             the moment a row takes focus would inset its cells by a pixel and jog the text,
-             so the pixel is always spent and only the colour changes. Not a FocusVisualStyle:
-             WPF draws that for the element that holds focus, and the mark has to stay on the
-             row while the focus is down inside one of its cells. -->
+             The focus inset is a Border laid over the row, not a border on it. DataGrid's
+             RowHeight is the height of the cells presenter, not of the row: a real border
+             adds its two pixels on top of the 34 and every row after the first moves down,
+             which cost the last row on screen its place at the default window size. An
+             overlay takes no layout at all, so the pitch stays exactly 34 and the
+             horizontal gridline stays where WPF draws it, at the bottom of the cell.
+
+             Transparent until the keyboard arrives, and never painted for the mouse. Not a
+             FocusVisualStyle either: WPF draws that for the element that holds focus, and
+             the mark has to stay on the row while the focus is down inside one of its
+             cells. Everything else in the template is the stock DataGridRow one, kept whole
+             so row headers and details behave as they always did. -->
         <Style TargetType="DataGridRow">
             <Setter Property="Background" Value="{DynamicResource Base}"/>
             <Setter Property="Foreground" Value="{DynamicResource Text}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridRow">
+                        <Border x:Name="Row" SnapsToDevicePixels="True"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <prim:SelectiveScrollingGrid>
+                                <prim:SelectiveScrollingGrid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </prim:SelectiveScrollingGrid.ColumnDefinitions>
+                                <prim:SelectiveScrollingGrid.RowDefinitions>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </prim:SelectiveScrollingGrid.RowDefinitions>
+                                <prim:DataGridCellsPresenter Grid.Column="1"
+                                        ItemsPanel="{TemplateBinding ItemsPanel}"
+                                        SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                <prim:DataGridDetailsPresenter
+                                    Grid.Column="1" Grid.Row="1"
+                                    Visibility="{TemplateBinding DetailsVisibility}"
+                                    prim:SelectiveScrollingGrid.SelectiveScrollingOrientation="{Binding
+                                        AreRowDetailsFrozen,
+                                        RelativeSource={RelativeSource AncestorType=DataGrid},
+                                        Converter={x:Static DataGrid.RowDetailsScrollingConverter},
+                                        ConverterParameter={x:Static SelectiveScrollingOrientation.Vertical}}"/>
+                                <prim:DataGridRowHeader
+                                    Grid.RowSpan="2"
+                                    prim:SelectiveScrollingGrid.SelectiveScrollingOrientation="Vertical"
+                                    Visibility="{Binding
+                                        HeadersVisibility,
+                                        RelativeSource={RelativeSource AncestorType=DataGrid},
+                                        Converter={x:Static DataGrid.HeadersVisibilityConverter},
+                                        ConverterParameter={x:Static DataGridHeadersVisibility.Row}}"/>
+                                <!-- Last, so it is drawn over the cells rather than under
+                                     them, and hit-test free so it cannot take a click that
+                                     belongs to the row. -->
+                                <Border x:Name="Focus" Grid.RowSpan="2" Grid.ColumnSpan="2"
+                                        BorderBrush="Transparent" BorderThickness="1"
+                                        IsHitTestVisible="False" SnapsToDevicePixels="True"/>
+                            </prim:SelectiveScrollingGrid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <!-- Not while a cell of it is open: the editor wears the accent
+                                 on its own edge, and an accent rectangle inside an accent
+                                 rectangle is one too many. -->
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsKeyboardFocusWithin" Value="True"/>
+                                    <Condition Property="IsEditing" Value="False"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Focus" Property="BorderBrush"
+                                        Value="{DynamicResource Accent}"/>
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
                     <Setter Property="Background" Value="{DynamicResource Surface1}"/>
@@ -1058,16 +1122,6 @@
                         <Condition Property="IsMouseOver" Value="True"/>
                     </MultiTrigger.Conditions>
                     <Setter Property="Background" Value="{DynamicResource Surface1}"/>
-                </MultiTrigger>
-                <!-- Not while a cell of it is open: the editor wears the accent on its own
-                     edge, and an accent rectangle inside an accent rectangle is one too
-                     many. -->
-                <MultiTrigger>
-                    <MultiTrigger.Conditions>
-                        <Condition Property="IsKeyboardFocusWithin" Value="True"/>
-                        <Condition Property="IsEditing" Value="False"/>
-                    </MultiTrigger.Conditions>
-                    <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
                 </MultiTrigger>
             </Style.Triggers>
         </Style>
