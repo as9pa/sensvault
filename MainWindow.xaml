@@ -930,6 +930,7 @@
                                        HorizontalAlignment="Left"/>
                         </StackPanel>
                         <CheckBox Grid.Column="1" x:Name="NoScrollBars" Style="{StaticResource Switch}"
+                                  AutomationProperties.Name="Disable scrollbars"
                                   VerticalAlignment="Center" Margin="16,0,0,0"
                                   Click="NoScrollBars_Click"/>
                     </Grid>
@@ -952,6 +953,7 @@
                                        HorizontalAlignment="Left"/>
                         </StackPanel>
                         <CheckBox Grid.Column="1" x:Name="NoStatusBar" Style="{StaticResource Switch}"
+                                  AutomationProperties.Name="Hide the status bar"
                                   VerticalAlignment="Center" Margin="16,0,0,0"
                                   Click="NoStatusBar_Click"/>
                     </Grid>
@@ -987,7 +989,7 @@
                      the library still offering that game; it just cannot be re-picked from a
                      drop-down until the game is ticked back on. -->
                 <Grid Grid.Row="1" x:Name="GamesSettings" Visibility="Collapsed"
-                      Margin="0,16,0,0" MaxWidth="640" HorizontalAlignment="Left">
+                      Margin="0,16,0,0" MinWidth="640" MaxWidth="640" HorizontalAlignment="Left">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
