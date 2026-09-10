@@ -147,11 +147,21 @@
                                 <Border Grid.Column="0" Height="1" Margin="0,0,8,0"
                                         VerticalAlignment="Center"
                                         Background="{DynamicResource Surface0}"/>
-                                <Path Grid.Column="1" Data="{StaticResource SyncIcon}"
-                                      Width="12" Height="12" Stretch="Uniform" Margin="8,0"
-                                      Stroke="{DynamicResource Overlay0}" StrokeThickness="1.6"
-                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                                      StrokeLineJoin="Round" ToolTip="Kept in sync"/>
+                                <!-- The tooltip hangs on the Border, not on the Path. A Path
+                                     with no Fill is hit-testable on its strokes alone, so on a
+                                     12px glyph drawn in 1.6px lines the pointer misses more
+                                     often than it hits; a transparent Border takes the hit
+                                     across its whole face, and the padding widens that face
+                                     past the ink. No margin of its own: the hairlines either
+                                     side already carry the 8px the word "or" stood in. -->
+                                <Border Grid.Column="1" Background="Transparent" Padding="4"
+                                        ToolTip="Kept in sync">
+                                    <Path Data="{StaticResource SyncIcon}"
+                                          Width="12" Height="12" Stretch="Uniform"
+                                          Stroke="{DynamicResource Overlay0}" StrokeThickness="1.6"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                          StrokeLineJoin="Round"/>
+                                </Border>
                                 <Border Grid.Column="2" Height="1" Margin="8,0,0,0"
                                         VerticalAlignment="Center"
                                         Background="{DynamicResource Surface0}"/>
