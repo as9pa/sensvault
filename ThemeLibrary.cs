@@ -37,7 +37,7 @@ public static class ThemeLibrary
             Surface1 = "#2E2E2E",
             Surface2 = "#3A3A3A",
             Surface3 = "#4A4A4A",
-            Overlay0 = "#707070",
+            Overlay0 = "#808080",
             Subtext = "#9C9C9C",
             Text = "#E8E8E8",
             TextStrong = "#FFFFFF",
