@@ -107,6 +107,23 @@ public static class ThemeManager
         SetBrush(r, "BevelLight", theme.BevelLight);
         SetBrush(r, "BevelDark", theme.BevelDark);
 
+        // Derived rather than declared. The accent is the one colour a theme is free to make
+        // anything, so the label printed on top of it cannot be a constant: white reads on
+        // Catppuccin's lavender and vanishes on Gruvbox's yellow. Rather than ask seventeen
+        // palettes for an eighteenth colour, take whichever ink the theme already declares
+        // stands furthest from its own accent.
+        //
+        // Frozen, unlike the palette brushes: nothing writes to it, the next apply replaces
+        // the whole entry, and freezing says so.
+        var accent = Theme.Parse(theme.Accent);
+        var ink = new SolidColorBrush(
+            new[] { theme.Crust, theme.TextStrong, theme.ButtonText }
+                .Select(Theme.Parse)
+                .MaxBy(c => Contrast(accent, c))
+        );
+        ink.Freeze();
+        r["AccentText"] = ink;
+
         // Square is all-or-nothing rather than per-token: a dialog that rounded its buttons
         // but not its fields would read as a bug, not as a style.
         var round = !theme.Square;
@@ -126,6 +143,28 @@ public static class ThemeManager
 
     private static void SetBrush(ResourceDictionary r, string key, string hex) =>
         r[key] = new SolidColorBrush(Theme.Parse(hex));
+
+    /// <summary>
+    /// WCAG 2.x contrast ratio between two sRGB colours: 1 for a pair that matches, 21 for
+    /// black against white. Only <see cref="Apply"/> uses it, to pick the ink for the accent.
+    /// </summary>
+    private static double Contrast(Color a, Color b)
+    {
+        double la = Luminance(a),
+            lb = Luminance(b);
+        return (Math.Max(la, lb) + 0.05) / (Math.Min(la, lb) + 0.05);
+
+        // Relative luminance: undo sRGB's gamma per channel, then weight the three by how
+        // much of the eye's response each one carries.
+        static double Luminance(Color c) =>
+            0.2126 * Linear(c.R) + 0.7152 * Linear(c.G) + 0.0722 * Linear(c.B);
+
+        static double Linear(byte channel)
+        {
+            var v = channel / 255.0;
+            return v <= 0.03928 ? v / 12.92 : Math.Pow((v + 0.055) / 1.055, 2.4);
+        }
+    }
 }
 
 /// <summary>

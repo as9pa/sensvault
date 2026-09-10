@@ -85,9 +85,11 @@
                 <TabItem Header="Create">
                     <ScrollViewer x:Name="CreateScroll" VerticalScrollBarVisibility="Auto"
                                   Margin="0,8,0,0">
-                        <StackPanel x:Name="DraftPanel">
+                        <StackPanel x:Name="DraftPanel"
+                                    PreviewKeyDown="DraftPanel_PreviewKeyDown">
                             <TextBlock Text="Name" Style="{StaticResource Label}"/>
-                            <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"/>
+                            <TextBox x:Name="NameBox"
+                                     Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"/>
 
                             <TextBlock Text="Game" Style="{StaticResource Label}"/>
                             <ComboBox x:Name="GameBox" IsSynchronizedWithCurrentItem="False"
@@ -108,21 +110,34 @@
                                          of. It keeps showing the number, because for those the
                                          sens and the cm/360 are the same one. -->
                                     <TextBox x:Name="SensBox" Text="1" TextChanged="SensBox_TextChanged"/>
+                                    <!-- Where the app says no about this box. Collapsed until
+                                         WarnAt fills it in, so it costs no height until there
+                                         is something to say. -->
+                                    <TextBlock x:Name="SensError" Visibility="Collapsed"
+                                               FontSize="{StaticResource FontCaption}"
+                                               Foreground="{DynamicResource Red}"
+                                               Margin="0,4,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
                                     <TextBlock Text="DPI" Style="{StaticResource Label}"/>
                                     <TextBox x:Name="DpiBox" TextChanged="DpiBox_TextChanged"/>
+                                    <TextBlock x:Name="DpiError" Visibility="Collapsed"
+                                               FontSize="{StaticResource FontCaption}"
+                                               Foreground="{DynamicResource Red}"
+                                               Margin="0,4,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </Grid>
 
-                            <!-- Sits between the two ways in, centred, so the either/or reads
-                                 off the layout instead of needing a sentence to explain it.
-                                 The rules either side are what make it read as a divider
-                                 rather than a stray word.
+                            <!-- Sits between the two ways in, centred, so the relationship
+                                 reads off the layout instead of needing a sentence to explain
+                                 it. The rules either side are what make it a divider rather
+                                 than a stray mark.
 
-                                 Ideal formatting locally: the window runs in Display mode,
-                                 which snaps glyphs to whole pixels. That is right for the
-                                 grid's numbers and brutal on one small dim word. -->
+                                 A glyph rather than the word "or", because "or" was the wrong
+                                 word: the two boxes are not alternatives you choose between,
+                                 they are one number shown two ways, and typing in either
+                                 fills in the other. Two arrows passing say that; nothing else
+                                 short enough to sit on a hairline does. -->
                             <Grid Margin="0,16,0,4">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -132,19 +147,37 @@
                                 <Border Grid.Column="0" Height="1" Margin="0,0,8,0"
                                         VerticalAlignment="Center"
                                         Background="{DynamicResource Surface0}"/>
-                                <TextBlock Grid.Column="1" Text="or" FontSize="{StaticResource FontSecondary}"
-                                           Foreground="{DynamicResource Overlay0}"
-                                           TextOptions.TextFormattingMode="Ideal"
-                                           TextOptions.TextRenderingMode="ClearType"/>
+                                <Path Grid.Column="1" Data="{StaticResource SyncIcon}"
+                                      Width="12" Height="12" Stretch="Uniform" Margin="8,0"
+                                      Stroke="{DynamicResource Overlay0}" StrokeThickness="1.6"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round" ToolTip="Kept in sync"/>
                                 <Border Grid.Column="2" Height="1" Margin="8,0,0,0"
                                         VerticalAlignment="Center"
                                         Background="{DynamicResource Surface0}"/>
                             </Grid>
 
                             <TextBlock Text="cm/360" Style="{StaticResource Label}" Margin="0,0,0,4"/>
-                            <TextBox x:Name="CmBox" TextChanged="CmBox_TextChanged"/>
+                            <Grid>
+                                <TextBox x:Name="CmBox" TextChanged="CmBox_TextChanged"/>
+                                <!-- Laid over the box rather than put in it, because the box's
+                                     text is the draft's number and a prompt written into it
+                                     would be parsed as one. Not hit-testable, so a click still
+                                     lands in the field under it; the 8px inset is where that
+                                     field puts its own first character. -->
+                                <TextBlock x:Name="CmPlaceholder" Text="Pick a game first"
+                                           Foreground="{DynamicResource Overlay0}"
+                                           IsHitTestVisible="False" Visibility="Collapsed"
+                                           VerticalAlignment="Center" Margin="8,0,0,0"/>
+                            </Grid>
+                            <TextBlock x:Name="CmError" Visibility="Collapsed"
+                                       FontSize="{StaticResource FontCaption}"
+                                       Foreground="{DynamicResource Red}"
+                                       Margin="0,4,0,0" TextWrapping="Wrap"/>
 
-                            <Button Content="Save" Click="AddProfile_Click" Margin="0,16,0,0"/>
+                            <!-- The one thing this panel is for, so it wears the accent. -->
+                            <Button Content="Save to vault" Style="{StaticResource PrimaryButton}"
+                                    Click="AddProfile_Click" Margin="0,16,0,0"/>
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>

@@ -118,6 +118,8 @@
         <Geometry x:Key="PlusIcon">M5.5,0 V11 M0,5.5 H11</Geometry>
         <Geometry x:Key="CaretDown">M0,0 L7,0 L3.5,4.5 Z</Geometry>
         <Geometry x:Key="ChevronsLeft">M4.5,0 L0.5,4.5 L4.5,9 M9.5,0 L5.5,4.5 L9.5,9</Geometry>
+        <!-- Two arrows passing each other, for the two boxes that write to one another. -->
+        <Geometry x:Key="SyncIcon">M5,2 V14 M5,2 L2.5,4.5 M5,2 L7.5,4.5 M11,14 V2 M11,14 L13.5,11.5 M11,14 L8.5,11.5</Geometry>
 
         <Style x:Key="Label" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource Subtext}"/>
@@ -196,6 +198,13 @@
                      the caret in a templated control is a child of the one being styled. -->
                 <Trigger Property="IsKeyboardFocusWithin" Value="True">
                     <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+                </Trigger>
+                <!-- After the focus edge, so it outranks it. A field the app has just
+                     refused has to stay refused while you are standing in it fixing it;
+                     going accent the moment the caret lands would take the complaint away
+                     at exactly the wrong time. MainWindow clears it on the next keystroke. -->
+                <Trigger Property="local:FieldState.IsInvalid" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource Red}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -397,6 +406,13 @@
                             <Trigger Property="IsKeyboardFocusWithin" Value="True">
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Accent}"/>
                             </Trigger>
+                            <!-- Last again, for the reason the text box's copy gives. It has
+                                 to live in here rather than in Style.Triggers: the three
+                                 above set Bd's brush directly, which outranks the template
+                                 binding a Style setter would be writing through. -->
+                            <Trigger Property="local:FieldState.IsInvalid" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Red}"/>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -553,6 +569,31 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <!-- The one button on a panel that commits what the panel is for. There is at most
+             one per tab, which is what earns it the accent: a second would leave neither of
+             them reading as the answer.
+
+             Setters only, on the attached properties the template above binds to, so this
+             shares that template instead of forking a second copy of it. The washes cannot
+             be steps on the grey ramp here, because the face is a colour rather than a step:
+             a thin TextStrong sheen lifts it and a thin Crust one presses it whatever the
+             theme has made the accent, and both stay quiet enough not to lose the label.
+
+             AccentText is the one key not declared above: no palette carries it, because a
+             label on the accent has to read on a lavender and on a yellow alike. ThemeManager
+             works it out per theme, as whichever of Crust, TextStrong and ButtonText stands
+             furthest from that theme's accent. -->
+        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{DynamicResource Accent}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentText}"/>
+            <Setter Property="local:Chrome.HoverBrush" Value="{DynamicResource TextStrong}"/>
+            <Setter Property="local:Chrome.HoverOpacity" Value="0.10"/>
+            <Setter Property="local:Chrome.PressedBrush" Value="{DynamicResource Crust}"/>
+            <Setter Property="local:Chrome.PressedOpacity" Value="0.16"/>
+            <!-- An accent ring drawn on an accent face is not there at all. -->
+            <Setter Property="FocusVisualStyle" Value="{StaticResource StrongFocusVisual}"/>
         </Style>
 
         <!-- A square, chromeless button for glyph-only affordances: the column picker's

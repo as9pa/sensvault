@@ -143,6 +143,7 @@ public partial class MainWindow : Window
         DataPath.Text = Store.Folder;
         ShowSettingsPage();
         ApplyDirectMode();
+        UpdateCmPlaceholder();
 
         Grid_.BeginningEdit += Grid_BeginningEdit;
         Grid_.CellEditEnding += (_, _) => FinishEditing();
@@ -346,6 +347,7 @@ public partial class MainWindow : Window
 
         ApplyDirectMode();
         Resync();
+        UpdateCmPlaceholder();
     }
 
     /// <summary>
@@ -428,6 +430,11 @@ public partial class MainWindow : Window
 
     private void DpiBox_TextChanged(object sender, TextChangedEventArgs e)
     {
+        // Ahead of the sync guard, and the same in the two handlers below. A complaint is
+        // about what is in the box, not about who put it there: a figure the Convert tab
+        // mirrored in here answers "DPI must be above zero" just as well as a typed one.
+        ClearWarning(DpiBox, DpiError);
+
         if (_syncing)
             return;
         DpiEntered(DpiBox, ToDpi);
@@ -456,6 +463,8 @@ public partial class MainWindow : Window
 
     private void SensBox_TextChanged(object sender, TextChangedEventArgs e)
     {
+        ClearWarning(SensBox, SensError);
+
         if (_syncing)
             return;
         _drivenByCm = false;
@@ -465,10 +474,31 @@ public partial class MainWindow : Window
 
     private void CmBox_TextChanged(object sender, TextChangedEventArgs e)
     {
+        ClearWarning(CmBox, CmError);
+        UpdateCmPlaceholder();
+
         if (_syncing)
             return;
         _drivenByCm = true;
         Resync();
+    }
+
+    /// <summary>
+    /// The prompt lying over an empty cm/360 box. It is only worth showing while no game is
+    /// picked, because that is the one state where the box cannot do anything: without a
+    /// game there is no yaw, and without a yaw a distance does not convert to a sensitivity.
+    /// With a game picked the box is live, so the prompt goes whether or not anything has
+    /// been typed into it yet.
+    /// </summary>
+    private void UpdateCmPlaceholder()
+    {
+        if (CmPlaceholder is null)
+            return;
+
+        CmPlaceholder.Visibility =
+            GameBox.SelectedItem is null && CmBox.Text.Length == 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
     }
 
     /// <summary>
@@ -509,6 +539,43 @@ public partial class MainWindow : Window
 
     // ---------- profiles ----------
 
+    /// <summary>
+    /// Enter, in any of the panel's fields, does what Save to vault does. Filling this panel
+    /// in is a typing job -- name, game, two numbers, again -- and reaching for the mouse
+    /// between each one is the slow part of it.
+    ///
+    /// PreviewKeyDown so the keystroke is seen before a field can swallow it, and on the
+    /// panel rather than on each of the five boxes, which is one handler instead of five
+    /// identical ones. Handled is set only when the save actually ran, so Enter on the Save
+    /// button, or with the game list open where it takes the highlighted entry, still does
+    /// what it always did.
+    /// </summary>
+    private void DraftPanel_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+            return;
+
+        // Which field, not which element: the game box is editable, so what holds focus
+        // inside it is the text box its template is built round rather than the box itself.
+        Control? field = Rows.Parent<ComboBox>(e.OriginalSource);
+        field ??= Rows.Parent<TextBox>(e.OriginalSource);
+
+        if (field is ComboBox { IsDropDownOpen: true })
+            return;
+
+        if (
+            field != NameBox
+            && field != GameBox
+            && field != SensBox
+            && field != DpiBox
+            && field != CmBox
+        )
+            return;
+
+        AddProfile_Click(sender, e);
+        e.Handled = true;
+    }
+
     private void AddProfile_Click(object sender, RoutedEventArgs e)
     {
         // The game is optional. Without one there is no yaw, so the row simply carries no
@@ -516,14 +583,17 @@ public partial class MainWindow : Window
         // cm/360 cell empty rather than pretending to a number it cannot work out.
         if (_draft.Sens <= 0)
         {
-            Warn(_draft.Direct ? "Enter a cm/360 above zero." : "Sensitivity must be above zero.");
+            if (_draft.Direct)
+                WarnAt(CmBox, CmError, "Enter a cm/360 above zero.");
+            else
+                WarnAt(SensBox, SensError, "Sensitivity must be above zero.");
             return;
         }
         // Only checked where it is actually used: a distance you typed in centimetres does
         // not go through the mouse's DPI to get there.
         if (!_draft.Direct && _draft.Dpi <= 0)
         {
-            Warn("DPI must be above zero.");
+            WarnAt(DpiBox, DpiError, "DPI must be above zero.");
             return;
         }
 
@@ -541,6 +611,11 @@ public partial class MainWindow : Window
         SetText(SensBox, "");
         SetText(CmBox, "");
         _draft.Sens = 0;
+
+        // Clearing the two boxes settles their own complaints on the way through, but the
+        // DPI box is not cleared -- it keeps the mouse's number -- so its one is settled here.
+        ClearDraftWarnings();
+        UpdateCmPlaceholder();
 
         // Neither box was the one typed into any more; without this the next keystroke in
         // one of them would be treated as a correction to whichever led last time. On a 1:1
@@ -1783,6 +1858,41 @@ public partial class MainWindow : Window
     {
         Status.SetResourceReference(TextBlock.ForegroundProperty, "Red");
         Status.Text = text;
+    }
+
+    /// <summary>
+    /// Says no at the field instead of on the status line: reds the field's edge and writes
+    /// the reason under it. A complaint about one box belongs beside that box. The status
+    /// line is in the far bottom corner of a window that can be 1180 wide, which is nowhere
+    /// near where anyone is looking when a number they have just typed is refused.
+    ///
+    /// The status line keeps everything that is not about a particular box -- a clipboard
+    /// that would not open, a folder that would not, a file that would not save.
+    ///
+    /// A Control rather than a TextBox: the edge is painted from FieldState, which the combo
+    /// box style reads as well.
+    /// </summary>
+    private void WarnAt(Control field, TextBlock caption, string message)
+    {
+        FieldState.SetIsInvalid(field, true);
+        caption.Text = message;
+        caption.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>Takes back what <see cref="WarnAt"/> said. The message is left in place, so a
+    /// complaint that comes straight back does not blink through empty.</summary>
+    private static void ClearWarning(Control field, TextBlock caption)
+    {
+        FieldState.SetIsInvalid(field, false);
+        caption.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>Every complaint the Create panel is holding, for a save that got through.</summary>
+    private void ClearDraftWarnings()
+    {
+        ClearWarning(SensBox, SensError);
+        ClearWarning(DpiBox, DpiError);
+        ClearWarning(CmBox, CmError);
     }
 
     private static double ParseOrZero(string? s) =>
