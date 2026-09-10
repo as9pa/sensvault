@@ -107,6 +107,23 @@ public static class ThemeManager
         SetBrush(r, "BevelLight", theme.BevelLight);
         SetBrush(r, "BevelDark", theme.BevelDark);
 
+        // Derived rather than declared. The accent is the one colour a theme is free to make
+        // anything, so the label printed on top of it cannot be a constant: white reads on
+        // Catppuccin's lavender and vanishes on Gruvbox's yellow. Rather than ask seventeen
+        // palettes for an eighteenth colour, take whichever ink the theme already declares
+        // stands furthest from its own accent.
+        //
+        // Frozen, unlike the palette brushes: nothing writes to it, the next apply replaces
+        // the whole entry, and freezing says so.
+        var accent = Theme.Parse(theme.Accent);
+        var ink = new SolidColorBrush(
+            new[] { theme.Crust, theme.TextStrong, theme.ButtonText }
+                .Select(Theme.Parse)
+                .MaxBy(c => Contrast(accent, c))
+        );
+        ink.Freeze();
+        r["AccentText"] = ink;
+
         // Square is all-or-nothing rather than per-token: a dialog that rounded its buttons
         // but not its fields would read as a bug, not as a style.
         var round = !theme.Square;
@@ -126,6 +143,28 @@ public static class ThemeManager
 
     private static void SetBrush(ResourceDictionary r, string key, string hex) =>
         r[key] = new SolidColorBrush(Theme.Parse(hex));
+
+    /// <summary>
+    /// WCAG 2.x contrast ratio between two sRGB colours: 1 for a pair that matches, 21 for
+    /// black against white. Only <see cref="Apply"/> uses it, to pick the ink for the accent.
+    /// </summary>
+    private static double Contrast(Color a, Color b)
+    {
+        double la = Luminance(a),
+            lb = Luminance(b);
+        return (Math.Max(la, lb) + 0.05) / (Math.Min(la, lb) + 0.05);
+
+        // Relative luminance: undo sRGB's gamma per channel, then weight the three by how
+        // much of the eye's response each one carries.
+        static double Luminance(Color c) =>
+            0.2126 * Linear(c.R) + 0.7152 * Linear(c.G) + 0.0722 * Linear(c.B);
+
+        static double Linear(byte channel)
+        {
+            var v = channel / 255.0;
+            return v <= 0.03928 ? v / 12.92 : Math.Pow((v + 0.055) / 1.055, 2.4);
+        }
+    }
 }
 
 /// <summary>
@@ -172,6 +211,25 @@ public sealed class ThemeCard : INotifyPropertyChanged
     public Brush Edge => _edge ??= Frozen(Theme.Surface3);
     public Brush Ring => _ring ??= Frozen(Theme.Accent);
 
+    /// <summary>The band down the left of the swatch. Mantle is what the app paints its left
+    /// panel and its grid header in, so the band is the stripe the window itself wears.</summary>
+    public Brush Band => _band ??= Frozen(Theme.Mantle);
+
+    /// <summary>The swatch's own edge, and the outline on the quietest pip. Surface1 is the
+    /// hairline the running app draws its fields and its separators with.</summary>
+    public Brush Hairline => _hairline ??= Frozen(Theme.Surface1);
+
+    /// <summary>The accent, for the first pip and for the tick the applied swatch wears. The
+    /// same brush as <see cref="Ring"/>: a theme has one accent, and one swatch shows it in
+    /// three places.</summary>
+    public Brush AccentBrush => Ring;
+
+    /// <summary>A button's face, as the middle pip.</summary>
+    public Brush PipMid => _pipMid ??= Frozen(Theme.Surface2);
+
+    /// <summary>A field's face, as the last pip.</summary>
+    public Brush PipLow => _pipLow ??= Frozen(Theme.Surface0);
+
     /// <summary>Square for the Classic pair, matching what picking them does to the app.</summary>
     public CornerRadius Radius => new(Theme.Square ? 0 : 8);
 
@@ -183,6 +241,10 @@ public sealed class ThemeCard : INotifyPropertyChanged
     private Brush? _fore;
     private Brush? _edge;
     private Brush? _ring;
+    private Brush? _band;
+    private Brush? _hairline;
+    private Brush? _pipMid;
+    private Brush? _pipLow;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

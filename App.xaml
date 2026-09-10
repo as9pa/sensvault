@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:SensVault"
              xmlns:prim="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
+             xmlns:sys="clr-namespace:System;assembly=System.Runtime"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
 
@@ -49,6 +50,54 @@
         <CornerRadius x:Key="RadCard">6</CornerRadius>
         <CornerRadius x:Key="RadPill">16</CornerRadius>
 
+        <!-- Type. Five sizes and no others, so a heading cannot end up one point off the
+             heading beside it. Static rather than dynamic: a theme may not resize the app. -->
+        <sys:Double x:Key="FontCaption">11</sys:Double>
+        <sys:Double x:Key="FontSecondary">12</sys:Double>
+        <sys:Double x:Key="FontBody">13</sys:Double>
+        <sys:Double x:Key="FontTitle">15</sys:Double>
+        <sys:Double x:Key="FontDisplay">24</sys:Double>
+
+        <!-- How long a hover or a press takes to arrive. App.OnStartup drops this to zero
+             when Windows has been told not to animate. -->
+        <Duration x:Key="MotionDuration">0:0:0.12</Duration>
+
+        <!-- Focus, as a focus visual rather than as a trigger. WPF draws one of these only
+             while the keyboard is driving and skips it for a click, which is the distinction
+             an IsKeyboardFocused trigger cannot make: a button takes focus when you press it,
+             so a trigger leaves a ring on everything you have clicked lately. It also lands in
+             the adorner layer, above the control and outside its layout.
+
+             A Border rather than the usual Rectangle, because RadiusX and RadiusY are plain
+             doubles and cannot take RadMd: a Rectangle would ring a rounded button with a
+             square, and would keep its corners under the Classic themes, which square
+             everything else. -->
+        <Style x:Key="AccentFocusVisual" TargetType="Control">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Control">
+                        <Border BorderBrush="{DynamicResource Accent}" BorderThickness="1"
+                                CornerRadius="{DynamicResource RadMd}"
+                                Margin="-1" SnapsToDevicePixels="True"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- The same ring for a control whose own face is the accent, where the accent ring
+             would land on itself and disappear. -->
+        <Style x:Key="StrongFocusVisual" TargetType="Control">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Control">
+                        <Border BorderBrush="{DynamicResource TextStrong}" BorderThickness="1"
+                                CornerRadius="{DynamicResource RadMd}"
+                                Margin="-1" SnapsToDevicePixels="True"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Top-left and bottom-right of the bevel, as two layers: a Border paints all four
              edges with one brush, so a raised or sunken frame cannot be done in a single one.
              Raised puts BevelLight on TL, sunken swaps them. -->
@@ -69,11 +118,21 @@
         <Geometry x:Key="PlusIcon">M5.5,0 V11 M0,5.5 H11</Geometry>
         <Geometry x:Key="CaretDown">M0,0 L7,0 L3.5,4.5 Z</Geometry>
         <Geometry x:Key="ChevronsLeft">M4.5,0 L0.5,4.5 L4.5,9 M9.5,0 L5.5,4.5 L9.5,9</Geometry>
+        <!-- Two arrows passing each other, for the two boxes that write to one another. -->
+        <Geometry x:Key="SyncIcon">M5,2 V14 M5,2 L2.5,4.5 M5,2 L7.5,4.5 M11,14 V2 M11,14 L13.5,11.5 M11,14 L8.5,11.5</Geometry>
+        <!-- One arrow, for the divider on the Convert panel: a conversion runs one way,
+             from the profile above it into the game below. -->
+        <Geometry x:Key="ArrowDownIcon">M8,2 V14 M8,14 L4,10 M8,14 L12,10</Geometry>
+        <!-- Two sheets, the front one over the back, for the cells that copy on a click. -->
+        <Geometry x:Key="CopyIcon">M6,6 H13 V13 H6 Z M3,10 V3 H10</Geometry>
+        <Geometry x:Key="SearchIcon">M7,2.5 a4.5,4.5 0 1 0 0,9 a4.5,4.5 0 0 0 0,-9 Z M10.3,10.3 L14,14</Geometry>
+        <!-- A tick, for the theme swatch that is the one applied. -->
+        <Geometry x:Key="CheckIcon">M3,8.5 L6.5,12 L13,4.5</Geometry>
 
         <Style x:Key="Label" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource Subtext}"/>
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Margin" Value="0,10,0,3"/>
+            <Setter Property="FontSize" Value="{StaticResource FontCaption}"/>
+            <Setter Property="Margin" Value="0,12,0,4"/>
         </Style>
 
         <Style TargetType="TextBox">
@@ -97,6 +156,9 @@
             <Setter Property="BorderBrush" Value="{DynamicResource Surface1}"/>
             <Setter Property="BorderThickness" Value="{DynamicResource EdgeT}"/>
             <Setter Property="Padding" Value="6,4"/>
+            <!-- The stock focus visual is a dotted rectangle drawn outside the control, which
+                 on a rounded box sits off the corners. The accent edge below replaces it. -->
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
@@ -138,6 +200,20 @@
                     <!-- Nothing is going in, so nothing should blink as though it might. -->
                     <Setter Property="CaretBrush" Value="Transparent"/>
                 </Trigger>
+                <!-- Last, so it wins over the read-only edge: a box you can tab into and
+                     select from still has to say when the keyboard is in it.
+                     IsKeyboardFocusWithin rather than IsFocused, because the box that holds
+                     the caret in a templated control is a child of the one being styled. -->
+                <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+                </Trigger>
+                <!-- After the focus edge, so it outranks it. A field the app has just
+                     refused has to stay refused while you are standing in it fixing it;
+                     going accent the moment the caret lands would take the complaint away
+                     at exactly the wrong time. MainWindow clears it on the next keystroke. -->
+                <Trigger Property="local:FieldState.IsInvalid" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource Red}"/>
+                </Trigger>
             </Style.Triggers>
         </Style>
 
@@ -162,6 +238,70 @@
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
 
+        <!-- A field that says what it filters. Everything except the template comes from
+             the default text box above, triggers included: the accent edge on focus and the
+             red one on a refusal still land, because this template binds BorderBrush the
+             same way the default one does.
+
+             The prompt is a TextBlock in the template rather than text put in the box. Text
+             in the box is text the filter would then go looking for, and clearing it would
+             be the user's job. It reads Chrome.Placeholder off the control, so a second
+             search field is a style reference and one attached property rather than a
+             second copy of this template. -->
+        <Style x:Key="SearchBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{DynamicResource RadMd}">
+                            <Border BorderBrush="{DynamicResource BevelDark}"
+                                    BorderThickness="{DynamicResource BevelTL}">
+                                <Border BorderBrush="{DynamicResource BevelLight}"
+                                        BorderThickness="{DynamicResource BevelBR}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Path Grid.Column="0" Data="{StaticResource SearchIcon}"
+                                              Width="13" Height="13" Stretch="Uniform"
+                                              Stroke="{DynamicResource Overlay0}" StrokeThickness="1.4"
+                                              StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                              StrokeLineJoin="Round" Margin="8,0,0,0"
+                                              VerticalAlignment="Center"/>
+                                        <!-- Prompt and caret share one cell and one inset, so
+                                             the first character lands exactly where the prompt
+                                             started. Trimmed rather than clipped: this box is
+                                             star-sized and can be squeezed narrower than the
+                                             sentence, which would otherwise be painted straight
+                                             out over the button beside it. -->
+                                        <Grid Grid.Column="1">
+                                            <ScrollViewer x:Name="PART_ContentHost"
+                                                          Margin="{TemplateBinding Padding}"/>
+                                            <TextBlock x:Name="Prompt" Visibility="Collapsed"
+                                                       Text="{TemplateBinding local:Chrome.Placeholder}"
+                                                       Foreground="{DynamicResource Overlay0}"
+                                                       IsHitTestVisible="False"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Margin="{TemplateBinding Padding}"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </Border>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Text" Value="">
+                                <Setter TargetName="Prompt" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- scrollbar: default WPF chrome is light and looks wrong on dark -->
         <Style TargetType="ScrollBar">
             <Setter Property="Background" Value="Transparent"/>
@@ -175,8 +315,23 @@
                                     <Thumb>
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
-                                                <Border Background="{DynamicResource Surface1}"
+                                                <Border x:Name="t" Background="{DynamicResource Surface1}"
                                                         CornerRadius="{DynamicResource RadLg}" Margin="2,0"/>
+                                                <ControlTemplate.Triggers>
+                                                    <!-- One step up to say it is grabbable, a
+                                                         second to say it is grabbed: dragging
+                                                         is the one time the pointer has left
+                                                         the thumb and the fill is all there is
+                                                         to confirm it. -->
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="t" Property="Background"
+                                                                Value="{DynamicResource Surface2}"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsDragging" Value="True">
+                                                        <Setter TargetName="t" Property="Background"
+                                                                Value="{DynamicResource Surface3}"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
                                             </ControlTemplate>
                                         </Thumb.Template>
                                     </Thumb>
@@ -207,6 +362,8 @@
             <Setter Property="BorderBrush" Value="{DynamicResource Surface1}"/>
             <Setter Property="BorderThickness" Value="{DynamicResource EdgeT}"/>
             <Setter Property="Padding" Value="8,5"/>
+            <!-- Same reason as the text box: the accent edge is the focus ring here. -->
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBox">
@@ -316,6 +473,18 @@
                             <Trigger Property="IsDropDownOpen" Value="True">
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Overlay0}"/>
                             </Trigger>
+                            <!-- Last of the three, so the keyboard's own signal outranks the
+                                 grey the mouse and the open list leave behind. -->
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Accent}"/>
+                            </Trigger>
+                            <!-- Last again, for the reason the text box's copy gives. It has
+                                 to live in here rather than in Style.Triggers: the three
+                                 above set Bd's brush directly, which outranks the template
+                                 binding a Style setter would be writing through. -->
+                            <Trigger Property="local:FieldState.IsInvalid" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Red}"/>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -336,6 +505,7 @@
         <Style TargetType="ComboBoxItem">
             <Setter Property="Foreground" Value="{DynamicResource Text}"/>
             <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AccentFocusVisual}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBoxItem">
@@ -359,6 +529,7 @@
         <Style TargetType="ListBoxItem">
             <Setter Property="Foreground" Value="{DynamicResource Text}"/>
             <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AccentFocusVisual}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
@@ -388,29 +559,80 @@
             <Setter Property="Padding" Value="12,7"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AccentFocusVisual}"/>
+            <!-- Brighten, don't dim. Fading a dark button toward a dark panel reads as "going
+                 away"; only a light button can dim on hover and still look pressed. Press then
+                 goes the other way, one step below the resting face, because a button that
+                 brightens further under the finger has nowhere left to go. -->
+            <Setter Property="local:Chrome.HoverBrush" Value="{DynamicResource Surface3}"/>
+            <Setter Property="local:Chrome.PressedBrush" Value="{DynamicResource Surface1}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="b" Background="{TemplateBinding Background}"
                                 CornerRadius="{DynamicResource RadLg}">
-                            <!-- Raised, the mirror of the field: light to the top-left. -->
-                            <Border BorderBrush="{DynamicResource BevelLight}"
-                                    BorderThickness="{DynamicResource BevelTL}">
-                                <Border BorderBrush="{DynamicResource BevelDark}"
-                                        BorderThickness="{DynamicResource BevelBR}">
-                                    <ContentPresenter HorizontalAlignment="Center"
-                                                      VerticalAlignment="Center"
-                                                      Margin="{TemplateBinding Padding}"/>
+                            <Grid>
+                                <!-- Hover and press are washes over the face rather than a new
+                                     Background on it, because a wash can fade: the palette
+                                     brushes are shared and frozen, so animating a colour is
+                                     out and animating an element's opacity is what is left.
+                                     The host carries Chrome.HoverOpacity so the animation
+                                     inside it can stay a plain 0 to 1. -->
+                                <Border IsHitTestVisible="False"
+                                        Opacity="{TemplateBinding local:Chrome.HoverOpacity}">
+                                    <Border x:Name="hover" Opacity="0"
+                                            CornerRadius="{DynamicResource RadLg}"
+                                            Background="{TemplateBinding local:Chrome.HoverBrush}"/>
                                 </Border>
-                            </Border>
+                                <Border x:Name="press" Visibility="Collapsed" IsHitTestVisible="False"
+                                        CornerRadius="{DynamicResource RadLg}"
+                                        Opacity="{TemplateBinding local:Chrome.PressedOpacity}"
+                                        Background="{TemplateBinding local:Chrome.PressedBrush}"/>
+                                <!-- Raised, the mirror of the field: light to the top-left. -->
+                                <Border BorderBrush="{DynamicResource BevelLight}"
+                                        BorderThickness="{DynamicResource BevelTL}">
+                                    <Border BorderBrush="{DynamicResource BevelDark}"
+                                            BorderThickness="{DynamicResource BevelBR}">
+                                        <ContentPresenter HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"
+                                                          Margin="{TemplateBinding Padding}"/>
+                                    </Border>
+                                </Border>
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
-                            <!-- Brighten, don't dim. Fading a dark button toward a dark panel
-                                 reads as "going away"; only a light button can dim on hover
-                                 and still look pressed. -->
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="b" Property="Background"
-                                        Value="{DynamicResource Surface3}"/>
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="hover"
+                                                             Storyboard.TargetProperty="Opacity" To="1"
+                                                             Duration="{StaticResource MotionDuration}">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="hover"
+                                                             Storyboard.TargetProperty="Opacity" To="0"
+                                                             Duration="{StaticResource MotionDuration}">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <!-- No fade on the way down. A press is an answer to something the
+                                 hand just did and has to land with it. -->
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="press" Property="Visibility" Value="Visible"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="b" Property="Opacity" Value="0.4"/>
@@ -421,23 +643,93 @@
             </Setter>
         </Style>
 
+        <!-- The one button on a panel that commits what the panel is for. There is at most
+             one per tab, which is what earns it the accent: a second would leave neither of
+             them reading as the answer.
+
+             Setters only, on the attached properties the template above binds to, so this
+             shares that template instead of forking a second copy of it. The washes cannot
+             be steps on the grey ramp here, because the face is a colour rather than a step:
+             a thin TextStrong sheen lifts it and a thin Crust one presses it whatever the
+             theme has made the accent, and both stay quiet enough not to lose the label.
+
+             AccentText is the one key not declared above: no palette carries it, because a
+             label on the accent has to read on a lavender and on a yellow alike. ThemeManager
+             works it out per theme, as whichever of Crust, TextStrong and ButtonText stands
+             furthest from that theme's accent. -->
+        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{DynamicResource Accent}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentText}"/>
+            <Setter Property="local:Chrome.HoverBrush" Value="{DynamicResource TextStrong}"/>
+            <Setter Property="local:Chrome.HoverOpacity" Value="0.10"/>
+            <Setter Property="local:Chrome.PressedBrush" Value="{DynamicResource Crust}"/>
+            <Setter Property="local:Chrome.PressedOpacity" Value="0.16"/>
+            <!-- An accent ring drawn on an accent face is not there at all. -->
+            <Setter Property="FocusVisualStyle" Value="{StaticResource StrongFocusVisual}"/>
+        </Style>
+
         <!-- A square, chromeless button for glyph-only affordances: the column picker's
              sliders, a row's delete cross, the "add a preset" plus. -->
         <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{DynamicResource Overlay0}"/>
             <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AccentFocusVisual}"/>
+            <!-- A glyph button starts from nothing, so its washes are the two quietest steps
+                 on the ramp rather than the two the commit button uses. -->
+            <Setter Property="local:Chrome.HoverBrush" Value="{DynamicResource Surface1}"/>
+            <Setter Property="local:Chrome.PressedBrush" Value="{DynamicResource Surface2}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="b" Background="{TemplateBinding Background}" CornerRadius="{DynamicResource RadMd}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              Margin="{TemplateBinding Padding}"/>
+                            <Grid>
+                                <Border IsHitTestVisible="False"
+                                        Opacity="{TemplateBinding local:Chrome.HoverOpacity}">
+                                    <Border x:Name="hover" Opacity="0"
+                                            CornerRadius="{DynamicResource RadMd}"
+                                            Background="{TemplateBinding local:Chrome.HoverBrush}"/>
+                                </Border>
+                                <Border x:Name="press" Visibility="Collapsed" IsHitTestVisible="False"
+                                        CornerRadius="{DynamicResource RadMd}"
+                                        Opacity="{TemplateBinding local:Chrome.PressedOpacity}"
+                                        Background="{TemplateBinding local:Chrome.PressedBrush}"/>
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Margin="{TemplateBinding Padding}"/>
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="b" Property="Background"
-                                        Value="{DynamicResource Surface1}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="hover"
+                                                             Storyboard.TargetProperty="Opacity" To="1"
+                                                             Duration="{StaticResource MotionDuration}">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="hover"
+                                                             Storyboard.TargetProperty="Opacity" To="0"
+                                                             Duration="{StaticResource MotionDuration}">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="press" Property="Visibility" Value="Visible"/>
                                 <Setter Property="Foreground" Value="{DynamicResource Text}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -446,11 +738,34 @@
             </Setter>
         </Style>
 
+        <!-- The two bulk commands on the games checklist. They act on the list beside
+             them rather than on the page, and two filled faces next to the search box would
+             read as the thing to do here; the label is the whole button and a face only
+             turns up under the mouse.
+
+             Setters only. The default template binds its washes to Chrome, so a quiet
+             button is a retint of that template rather than a fourth copy of it. -->
+        <Style x:Key="QuietButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource Subtext}"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="local:Chrome.HoverBrush" Value="{DynamicResource Surface1}"/>
+            <Setter Property="local:Chrome.PressedBrush" Value="{DynamicResource Surface2}"/>
+        </Style>
+
         <!-- Framed toggle for the column picker: reads as an input, not a command. -->
         <Style x:Key="IconToggle" TargetType="ToggleButton">
             <Setter Property="Foreground" Value="{DynamicResource Overlay0}"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Focusable" Value="False"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AccentFocusVisual}"/>
+            <!-- Unchecked, the wash is the face's own colour and the hover reads off the
+                 border and the glyph instead: Surface1 is what checked looks like, and
+                 hovering an empty toggle should not make it look ticked. Checked swaps the
+                 wash for a step above itself, in the trigger below. -->
+            <Setter Property="local:Chrome.HoverBrush" Value="{DynamicResource Surface0}"/>
+            <Setter Property="local:Chrome.PressedBrush" Value="{DynamicResource Surface2}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
@@ -458,26 +773,69 @@
                                 BorderBrush="{DynamicResource Surface1}"
                                 BorderThickness="{DynamicResource EdgeT}"
                                 CornerRadius="{DynamicResource RadMd}">
-                            <Border BorderBrush="{DynamicResource BevelLight}"
-                                    BorderThickness="{DynamicResource BevelTL}">
-                                <Border BorderBrush="{DynamicResource BevelDark}"
-                                        BorderThickness="{DynamicResource BevelBR}">
-                                    <ContentPresenter HorizontalAlignment="Center"
-                                                      VerticalAlignment="Center"/>
+                            <Grid>
+                                <Border IsHitTestVisible="False"
+                                        Opacity="{TemplateBinding local:Chrome.HoverOpacity}">
+                                    <Border x:Name="hover" Opacity="0"
+                                            CornerRadius="{DynamicResource RadMd}"
+                                            Background="{TemplateBinding local:Chrome.HoverBrush}"/>
                                 </Border>
-                            </Border>
+                                <Border x:Name="press" Visibility="Collapsed" IsHitTestVisible="False"
+                                        CornerRadius="{DynamicResource RadMd}"
+                                        Opacity="{TemplateBinding local:Chrome.PressedOpacity}"
+                                        Background="{TemplateBinding local:Chrome.PressedBrush}"/>
+                                <Border BorderBrush="{DynamicResource BevelLight}"
+                                        BorderThickness="{DynamicResource BevelTL}">
+                                    <Border BorderBrush="{DynamicResource BevelDark}"
+                                            BorderThickness="{DynamicResource BevelBR}">
+                                        <ContentPresenter HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"/>
+                                    </Border>
+                                </Border>
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="b" Property="BorderBrush"
                                         Value="{DynamicResource Overlay0}"/>
                                 <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="hover"
+                                                             Storyboard.TargetProperty="Opacity" To="1"
+                                                             Duration="{StaticResource MotionDuration}">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="hover"
+                                                             Storyboard.TargetProperty="Opacity" To="0"
+                                                             Duration="{StaticResource MotionDuration}">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="press" Property="Visibility" Value="Visible"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="b" Property="Background"
                                         Value="{DynamicResource Surface1}"/>
                                 <Setter TargetName="b" Property="BorderBrush"
                                         Value="{DynamicResource Overlay0}"/>
+                                <Setter TargetName="hover" Property="Background"
+                                        Value="{DynamicResource Surface2}"/>
                                 <Setter Property="Foreground" Value="{DynamicResource Text}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -489,8 +847,9 @@
         <!-- The stock checkbox paints a light box with black text and looks broken here. -->
         <Style TargetType="CheckBox">
             <Setter Property="Foreground" Value="{DynamicResource Text}"/>
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontSize" Value="{StaticResource FontSecondary}"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AccentFocusVisual}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
@@ -546,6 +905,103 @@
             </Setter>
         </Style>
 
+        <!-- A preference that takes effect the moment it is thrown, for the General page.
+             A tick box says "I have marked this, now go"; a switch says the thing is on
+             already, which is what a setting that repaints the window as you click it is.
+
+             It draws no label. A row on that page is a title and a sentence saying what the
+             setting costs, and both are set beside the switch rather than inside it, so
+             Content is left alone for the row to place.
+
+             The knob slides rather than jumping. It is the one moving part on the page and
+             the travel is what says which way the setting just went. MotionDuration is zero
+             when Windows has been asked for no animation, and a zero-length animation lands
+             on its To value at once. -->
+        <Style x:Key="Switch" TargetType="CheckBox">
+            <Setter Property="Cursor" Value="Hand"/>
+            <!-- The keyboard ring is drawn on the track below. The shared adorner sits
+                 outside the control, and the two together read as a switch in a box. -->
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <!-- The edge is 1px whatever happens and only transparent until the
+                             keyboard arrives: a track that grew a border on focus would
+                             squeeze the knob by a pixel as it landed. -->
+                        <Border x:Name="track" Width="32" Height="18"
+                                Background="{DynamicResource Surface2}"
+                                BorderBrush="Transparent" BorderThickness="1"
+                                CornerRadius="{DynamicResource RadPill}">
+                            <!-- Named, which is what keeps it out of the frozen objects a
+                                 template is otherwise built from: a frozen transform cannot
+                                 be animated. -->
+                            <Ellipse x:Name="knob" Width="12" Height="12"
+                                     Fill="{DynamicResource Subtext}"
+                                     Margin="2,0,0,0"
+                                     HorizontalAlignment="Left" VerticalAlignment="Center">
+                                <Ellipse.RenderTransform>
+                                    <TranslateTransform x:Name="slide"/>
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="track" Property="Background"
+                                        Value="{DynamicResource Accent}"/>
+                                <Setter TargetName="knob" Property="Fill"
+                                        Value="{DynamicResource AccentText}"/>
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="slide"
+                                                             Storyboard.TargetProperty="X" To="14"
+                                                             Duration="{StaticResource MotionDuration}">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="slide"
+                                                             Storyboard.TargetProperty="X" To="0"
+                                                             Duration="{StaticResource MotionDuration}">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="track" Property="BorderBrush"
+                                        Value="{DynamicResource Accent}"/>
+                            </Trigger>
+                            <!-- An accent edge on an accent track is not there at all, so a
+                                 switch that is on borrows the ink its own knob is painted
+                                 in. Declared after the plain focus trigger, which is what
+                                 lets it win over it. -->
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsChecked" Value="True"/>
+                                    <Condition Property="IsKeyboardFocused" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="track" Property="BorderBrush"
+                                        Value="{DynamicResource AccentText}"/>
+                            </MultiTrigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- The stock TabControl template hardcodes <TabPanel IsItemsHost="True"/>, so
              overriding ItemsPanel alone does nothing. A DockPanel host is what lets the
              settings tab sit at the far right of the same strip as the text tabs. -->
@@ -585,6 +1041,7 @@
 
         <Style TargetType="TabItem">
             <Setter Property="Foreground" Value="{DynamicResource Overlay0}"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AccentFocusVisual}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
@@ -597,6 +1054,16 @@
                                 <Setter TargetName="b" Property="Background" Value="{DynamicResource Surface0}"/>
                                 <Setter Property="Foreground" Value="{DynamicResource Text}"/>
                             </Trigger>
+                            <!-- Halfway to selected, and only on the tabs you can still go to.
+                                 The selected tab already sits at Text and has nowhere to
+                                 brighten to. -->
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                    <Condition Property="IsSelected" Value="False"/>
+                                </MultiTrigger.Conditions>
+                                <Setter Property="Foreground" Value="{DynamicResource Subtext}"/>
+                            </MultiTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -622,7 +1089,7 @@
         <Style TargetType="prim:DataGridColumnHeader">
             <Setter Property="Background" Value="{DynamicResource Mantle}"/>
             <Setter Property="Foreground" Value="{DynamicResource Subtext}"/>
-            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontSize" Value="{StaticResource FontCaption}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Padding" Value="8,7"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Surface0}"/>
@@ -679,16 +1146,101 @@
             </Setter>
         </Style>
 
+        <!-- Base at rest and two steps up from it: pointing at a row lifts it to Surface0,
+             selecting it to Surface1. Both used to sit a step lower, which put hover on
+             Mantle, the panel colour from under the grid, so the row you were pointing at
+             read as a dent rather than as the one you were about to act on. The
+             MultiTrigger is what stops a selected row you happen to be over from dropping
+             back down to the hover colour.
+
+             The focus inset is a Border laid over the row, not a border on it. DataGrid's
+             RowHeight is the height of the cells presenter, not of the row: a real border
+             adds its two pixels on top of the 34 and every row after the first moves down,
+             which cost the last row on screen its place at the default window size. An
+             overlay takes no layout at all, so the pitch stays exactly 34 and the
+             horizontal gridline stays where WPF draws it, at the bottom of the cell.
+
+             Transparent until the keyboard arrives, and never painted for the mouse. Not a
+             FocusVisualStyle either: WPF draws that for the element that holds focus, and
+             the mark has to stay on the row while the focus is down inside one of its
+             cells. Everything else in the template is the stock DataGridRow one, kept whole
+             so row headers and details behave as they always did. -->
         <Style TargetType="DataGridRow">
             <Setter Property="Background" Value="{DynamicResource Base}"/>
             <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridRow">
+                        <Border x:Name="Row" SnapsToDevicePixels="True"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <prim:SelectiveScrollingGrid>
+                                <prim:SelectiveScrollingGrid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </prim:SelectiveScrollingGrid.ColumnDefinitions>
+                                <prim:SelectiveScrollingGrid.RowDefinitions>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </prim:SelectiveScrollingGrid.RowDefinitions>
+                                <prim:DataGridCellsPresenter Grid.Column="1"
+                                        ItemsPanel="{TemplateBinding ItemsPanel}"
+                                        SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                <prim:DataGridDetailsPresenter
+                                    Grid.Column="1" Grid.Row="1"
+                                    Visibility="{TemplateBinding DetailsVisibility}"
+                                    prim:SelectiveScrollingGrid.SelectiveScrollingOrientation="{Binding
+                                        AreRowDetailsFrozen,
+                                        RelativeSource={RelativeSource AncestorType=DataGrid},
+                                        Converter={x:Static DataGrid.RowDetailsScrollingConverter},
+                                        ConverterParameter={x:Static SelectiveScrollingOrientation.Vertical}}"/>
+                                <prim:DataGridRowHeader
+                                    Grid.RowSpan="2"
+                                    prim:SelectiveScrollingGrid.SelectiveScrollingOrientation="Vertical"
+                                    Visibility="{Binding
+                                        HeadersVisibility,
+                                        RelativeSource={RelativeSource AncestorType=DataGrid},
+                                        Converter={x:Static DataGrid.HeadersVisibilityConverter},
+                                        ConverterParameter={x:Static DataGridHeadersVisibility.Row}}"/>
+                                <!-- Last, so it is drawn over the cells rather than under
+                                     them, and hit-test free so it cannot take a click that
+                                     belongs to the row. -->
+                                <Border x:Name="Focus" Grid.RowSpan="2" Grid.ColumnSpan="2"
+                                        BorderBrush="Transparent" BorderThickness="1"
+                                        IsHitTestVisible="False" SnapsToDevicePixels="True"/>
+                            </prim:SelectiveScrollingGrid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <!-- Not while a cell of it is open: the editor wears the accent
+                                 on its own edge, and an accent rectangle inside an accent
+                                 rectangle is one too many. -->
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsKeyboardFocusWithin" Value="True"/>
+                                    <Condition Property="IsEditing" Value="False"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Focus" Property="BorderBrush"
+                                        Value="{DynamicResource Accent}"/>
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource Surface0}"/>
+                    <Setter Property="Background" Value="{DynamicResource Surface1}"/>
                 </Trigger>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource Mantle}"/>
+                    <Setter Property="Background" Value="{DynamicResource Surface0}"/>
                 </Trigger>
+                <MultiTrigger>
+                    <MultiTrigger.Conditions>
+                        <Condition Property="IsSelected" Value="True"/>
+                        <Condition Property="IsMouseOver" Value="True"/>
+                    </MultiTrigger.Conditions>
+                    <Setter Property="Background" Value="{DynamicResource Surface1}"/>
+                </MultiTrigger>
             </Style.Triggers>
         </Style>
 
@@ -716,6 +1268,81 @@
                     <Setter Property="Padding" Value="5,2"/>
                 </Trigger>
             </Style.Triggers>
+        </Style>
+
+        <!-- The cells you can click to copy, with the glyph that says so. It shows only
+             while the row is under the pointer: on every row it would be two columns of
+             clutter down the whole grid, and on none of them the feature stays what it has
+             been until now, which is invisible.
+
+             In the cell rather than in a template column, so the two columns keep the
+             machinery they already have: the G6 format, the sort, and in the sens column an
+             editor that opens on a double click. A DataGridTemplateColumn would have to be
+             handed all three again, and its editing template would need its own focus.
+
+             The glyph takes its width from the row rather than overlapping the number: a
+             hint painted over the value it is offering to copy is the one thing it must not
+             do. -->
+        <Style x:Key="CopyCell" TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridCell">
+                        <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter Grid.Column="0" VerticalAlignment="Center"/>
+                                <Path x:Name="Hint" Grid.Column="1" Visibility="Collapsed"
+                                      Data="{StaticResource CopyIcon}"
+                                      Width="12" Height="12" Stretch="Uniform"
+                                      Stroke="{DynamicResource Overlay0}" StrokeThickness="1.6"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round" Margin="8,0,0,0"
+                                      VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Value="True"
+                                         Binding="{Binding IsMouseOver,
+                                                   RelativeSource={RelativeSource AncestorType=DataGridRow}}">
+                                <Setter TargetName="Hint" Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                            <!-- After the hover trigger, so it wins: a cell open for editing
+                                 gives the editor the whole width back. -->
+                            <Trigger Property="IsEditing" Value="True">
+                                <Setter TargetName="Hint" Property="Visibility" Value="Collapsed"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Tooltips. The stock one is a pale yellow Win32 rectangle with a square border,
+             which is the last piece of system chrome the app had left. Every existing
+             ToolTip="..." picks this up, since a bare string is wrapped in a ToolTip and the
+             implicit style finds it. -->
+        <Style TargetType="ToolTip">
+            <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+            <Setter Property="FontSize" Value="{StaticResource FontCaption}"/>
+            <!-- The system shadow ignores the corner radius and leaves square corners
+                 hanging off the card, the same way it did on the context menu. -->
+            <Setter Property="HasDropShadow" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToolTip">
+                        <Border Background="{DynamicResource Surface1}"
+                                BorderBrush="{DynamicResource Surface2}"
+                                BorderThickness="1"
+                                CornerRadius="{DynamicResource RadMd}"
+                                Padding="8,4">
+                            <ContentPresenter/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- Right-click menus. Stock WPF menus are drawn in the system light theme and

@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Reflection;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -141,8 +142,16 @@ public partial class MainWindow : Window
         NoStatusBar.IsChecked = _data.HideStatusBar;
         ApplyStatusBar();
         DataPath.Text = Store.Folder;
+
+        // Read off the assembly rather than written into the XAML: the csproj's <Version> is
+        // the one place the number is kept, and a second copy here would go stale the first
+        // time it was bumped. Revision is left off; nothing sets it.
+        var version = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0);
+        VersionLine.Text = $"SensVault {version.Major}.{version.Minor}.{version.Build}";
+
         ShowSettingsPage();
         ApplyDirectMode();
+        UpdateCmPlaceholder();
 
         Grid_.BeginningEdit += Grid_BeginningEdit;
         Grid_.CellEditEnding += (_, _) => FinishEditing();
@@ -166,7 +175,7 @@ public partial class MainWindow : Window
         Closing += (_, _) => Save();
 
         _ready = true;
-        SetStatus(Store.FilePath);
+        RefreshSummary();
 
         // TEMP probe
         Loaded += (_, _) =>
@@ -346,6 +355,16 @@ public partial class MainWindow : Window
 
         ApplyDirectMode();
         Resync();
+
+        // A refusal was about the game that was picked when Save was pressed, so it goes when
+        // that game does. It cannot be left to the boxes' own TextChanged to settle: Resync
+        // writes them through SetText, which no-ops when the text has not actually changed.
+        // Refuse an empty sens box, then pick a 1:1 game, and Resync computes a sens of zero
+        // and writes the "" that is already there -- no TextChanged, no clear, and the box is
+        // left read-only, red, and carrying a message there is no longer any way to act on.
+        // The mirror is a stale cm/360 complaint sitting under "Pick a game first".
+        ClearDraftWarnings();
+        UpdateCmPlaceholder();
     }
 
     /// <summary>
@@ -428,6 +447,11 @@ public partial class MainWindow : Window
 
     private void DpiBox_TextChanged(object sender, TextChangedEventArgs e)
     {
+        // Ahead of the sync guard, and the same in the two handlers below. A complaint is
+        // about what is in the box, not about who put it there: a figure the Convert tab
+        // mirrored in here answers "DPI must be above zero" just as well as a typed one.
+        ClearWarning(DpiBox, DpiError);
+
         if (_syncing)
             return;
         DpiEntered(DpiBox, ToDpi);
@@ -435,6 +459,11 @@ public partial class MainWindow : Window
 
     private void ToDpi_TextChanged(object sender, TextChangedEventArgs e)
     {
+        // Ahead of the sync guard, for the reason the handler above gives: a figure the
+        // Create tab mirrored in here answers "Target DPI must be a positive number" just as
+        // well as a typed one does.
+        ClearWarning(ToDpi, ToDpiError);
+
         if (_syncing)
             return;
         DpiEntered(ToDpi, DpiBox);
@@ -456,6 +485,8 @@ public partial class MainWindow : Window
 
     private void SensBox_TextChanged(object sender, TextChangedEventArgs e)
     {
+        ClearWarning(SensBox, SensError);
+
         if (_syncing)
             return;
         _drivenByCm = false;
@@ -465,10 +496,33 @@ public partial class MainWindow : Window
 
     private void CmBox_TextChanged(object sender, TextChangedEventArgs e)
     {
+        ClearWarning(CmBox, CmError);
+        UpdateCmPlaceholder();
+
         if (_syncing)
             return;
         _drivenByCm = true;
         Resync();
+    }
+
+    /// <summary>
+    /// The prompt lying over an empty cm/360 box. It is only worth showing while no game is
+    /// picked, because that is the one state where the box cannot do anything: without a
+    /// game there is no yaw, and without a yaw a distance does not convert to a sensitivity.
+    /// With a game picked the box is live, so the prompt goes whether or not anything has
+    /// been typed into it yet.
+    /// </summary>
+    private void UpdateCmPlaceholder()
+    {
+        // GameBox_SelectionChanged can arrive mid-parse too, when the box it wants to read
+        // and the prompt it wants to place are both still to come.
+        if (GameBox is null || CmBox is null || CmPlaceholder is null)
+            return;
+
+        CmPlaceholder.Visibility =
+            GameBox.SelectedItem is null && CmBox.Text.Length == 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
     }
 
     /// <summary>
@@ -509,6 +563,43 @@ public partial class MainWindow : Window
 
     // ---------- profiles ----------
 
+    /// <summary>
+    /// Enter, in any of the panel's fields, does what Save to vault does. Filling this panel
+    /// in is a typing job -- name, game, two numbers, again -- and reaching for the mouse
+    /// between each one is the slow part of it.
+    ///
+    /// PreviewKeyDown so the keystroke is seen before a field can swallow it, and on the
+    /// panel rather than on each of the five boxes, which is one handler instead of five
+    /// identical ones. Handled is set only when the save actually ran, so Enter on the Save
+    /// button, or with the game list open where it takes the highlighted entry, still does
+    /// what it always did.
+    /// </summary>
+    private void DraftPanel_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+            return;
+
+        // Which field, not which element: the game box is editable, so what holds focus
+        // inside it is the text box its template is built round rather than the box itself.
+        Control? field = Rows.Parent<ComboBox>(e.OriginalSource);
+        field ??= Rows.Parent<TextBox>(e.OriginalSource);
+
+        if (field is ComboBox { IsDropDownOpen: true })
+            return;
+
+        if (
+            field != NameBox
+            && field != GameBox
+            && field != SensBox
+            && field != DpiBox
+            && field != CmBox
+        )
+            return;
+
+        AddProfile_Click(sender, e);
+        e.Handled = true;
+    }
+
     private void AddProfile_Click(object sender, RoutedEventArgs e)
     {
         // The game is optional. Without one there is no yaw, so the row simply carries no
@@ -516,14 +607,17 @@ public partial class MainWindow : Window
         // cm/360 cell empty rather than pretending to a number it cannot work out.
         if (_draft.Sens <= 0)
         {
-            Warn(_draft.Direct ? "Enter a cm/360 above zero." : "Sensitivity must be above zero.");
+            if (_draft.Direct)
+                WarnAt(CmBox, CmError, "Enter a cm/360 above zero.");
+            else
+                WarnAt(SensBox, SensError, "Sensitivity must be above zero.");
             return;
         }
         // Only checked where it is actually used: a distance you typed in centimetres does
         // not go through the mouse's DPI to get there.
         if (!_draft.Direct && _draft.Dpi <= 0)
         {
-            Warn("DPI must be above zero.");
+            WarnAt(DpiBox, DpiError, "DPI must be above zero.");
             return;
         }
 
@@ -533,6 +627,12 @@ public partial class MainWindow : Window
 
         _profiles.Add(p);
 
+        // Nothing to offer taking back -- the row is what was just asked for -- but the
+        // record has to go all the same. Undo is one step, and the step it holds has to be
+        // the last thing that happened, or Ctrl+Z reaches past this row to a vault that is
+        // no longer the one on screen.
+        _undo = null;
+
         // Clear what belongs to the one sensitivity just saved -- its name and its two number
         // boxes -- and keep what belongs to the session. The DPI is the mouse's and does not
         // change between entries, and the game is usually the same for a run of them, so
@@ -541,6 +641,11 @@ public partial class MainWindow : Window
         SetText(SensBox, "");
         SetText(CmBox, "");
         _draft.Sens = 0;
+
+        // Clearing the two boxes settles their own complaints on the way through, but the
+        // DPI box is not cleared -- it keeps the mouse's number -- so its one is settled here.
+        ClearDraftWarnings();
+        UpdateCmPlaceholder();
 
         // Neither box was the one typed into any more; without this the next keystroke in
         // one of them would be treated as a correction to whichever led last time. On a 1:1
@@ -560,10 +665,16 @@ public partial class MainWindow : Window
         if (doomed.Count == 0)
             return;
 
+        // Where each row sits now, taken before any of them has gone: the moment the first
+        // one is out, every index after it is one too high. See Undo for the way back.
+        var what = Which(doomed);
+        _undo = (what, doomed.Select(p => (Profile: p, Index: _profiles.IndexOf(p))).ToList(), []);
+
         foreach (var p in doomed)
             _profiles.Remove(p);
         Renumber();
         SetStatus($"Deleted {doomed.Count} profile{(doomed.Count == 1 ? "" : "s")}.");
+        ShowToast($"Deleted {what}", undoable: true);
     }
 
     /// <summary>
@@ -583,16 +694,21 @@ public partial class MainWindow : Window
         if (_reorder.IsReordering || Grid_.SelectedItems.Count == 0)
             return false;
 
-        // Wherever text is being typed -- the entry panel's boxes, the game cell's editable
-        // combo, an open cell editor -- Delete belongs to the caret and not to the row.
-        if (Keyboard.FocusedElement is TextBoxBase)
-            return false;
-        if (Rows.Parent<DataGridCell>(Keyboard.FocusedElement)?.IsEditing == true)
+        // Wherever text is being typed, Delete belongs to the caret and not to the row.
+        if (Typing())
             return false;
 
         DeleteSelected();
         return true;
     }
+
+    /// <summary>True while the keys belong to a caret rather than to the vault: one of the
+    /// entry panel's boxes, the game cell's editable combo, an open cell editor.</summary>
+    private static bool Typing() => Keyboard.FocusedElement is TextBoxBase || EditingCell();
+
+    /// <summary>True while a cell of the grid is open for editing.</summary>
+    private static bool EditingCell() =>
+        Rows.Parent<DataGridCell>(Keyboard.FocusedElement)?.IsEditing == true;
 
     /// <summary>
     /// Clicking anywhere that is not a profile row drops the selection, so the vault never
@@ -614,6 +730,10 @@ public partial class MainWindow : Window
 
         // Scrolling is navigation, not a change of mind about what is selected.
         if (Rows.Parent<ScrollBar>(origin) is not null)
+            return;
+
+        // Reaching for the toast's Undo is not a change of mind about what is selected.
+        if (origin is Visual clicked && Toast.IsAncestorOf(clicked))
             return;
 
         if (Grid_.SelectedItems.Count == 0)
@@ -740,6 +860,7 @@ public partial class MainWindow : Window
         // is where you look for it. Walked back to front so inserting cannot shift an index
         // that has not been used yet.
         SensProfile? landed = null;
+        var copies = new List<SensProfile>();
         foreach (var source in picked.OrderByDescending(_profiles.IndexOf))
         {
             var copy = source.Clone();
@@ -747,12 +868,19 @@ public partial class MainWindow : Window
                 copy.Name += " copy";
 
             _profiles.Insert(_profiles.IndexOf(source) + 1, copy);
+            copies.Add(copy);
             landed = copy;
         }
 
         Renumber();
         SelectOnly(landed);
         SetStatus($"Duplicated {Count(picked.Count)}.");
+
+        // Named after the rows duplicated rather than the copies: the copy of "cs" is
+        // called "cs copy", and "Duplicated cs copy" is not what just happened.
+        var what = Which(picked);
+        _undo = (what, [], copies);
+        ShowToast($"Duplicated {what}", undoable: true);
     }
 
     private void RowDelete_Click(object sender, RoutedEventArgs e) => DeleteSelected();
@@ -781,8 +909,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        ToastText.Text = $"Copied  {Count(picked.Count)}";
-        ((Storyboard)FindResource("ToastPop")).Begin(this, isControllable: true);
+        ShowToast($"Copied  {Count(picked.Count)}");
     }
 
     private void RowPaste_Click(object sender, RoutedEventArgs e)
@@ -806,6 +933,10 @@ public partial class MainWindow : Window
         Renumber();
         SelectOnly(landed);
         SetStatus($"Pasted {Count(pasted.Count)}.");
+
+        var what = Which(pasted);
+        _undo = (what, [], pasted);
+        ShowToast($"Pasted {what}", undoable: true);
     }
 
     private bool HasProfilesOnClipboard()
@@ -860,6 +991,12 @@ public partial class MainWindow : Window
     }
 
     private static string Count(int n) => $"{n} profile{(n == 1 ? "" : "s")}";
+
+    /// <summary>What a toast calls a set of rows: the one row by its own label, or how many
+    /// there are. A single row is worth naming -- "Deleted oak" says which one went in a way
+    /// "Deleted 1 profile" does not -- and past one there is no name that covers them.</summary>
+    private static string Which(List<SensProfile> rows) =>
+        rows.Count == 1 ? rows[0].Label : Count(rows.Count);
 
     private void SelectOnly(SensProfile? p)
     {
@@ -941,8 +1078,95 @@ public partial class MainWindow : Window
             return;
         }
 
-        ToastText.Text = $"Copied  {text}";
-        ((Storyboard)FindResource("ToastPop")).Begin(this, isControllable: true);
+        ShowToast($"Copied  {text}");
+    }
+
+    // ---------- the toast ----------
+
+    /// <summary>
+    /// Raises the pill with <paramref name="text"/> on it.
+    ///
+    /// An undoable action passes true, which puts the Undo link and its key hint on the end
+    /// of the line and holds the pill up for six seconds instead of one and a quarter. A
+    /// receipt only has to be read; an offer has to be read, weighed and reached for.
+    /// </summary>
+    private void ShowToast(string text, bool undoable = false)
+    {
+        ToastText.Text = text;
+        ToastAction.Visibility = undoable ? Visibility.Visible : Visibility.Collapsed;
+
+        // Only a pill with something to click takes the mouse. The rest of the time it hangs
+        // over the grid's own rows with no business intercepting anything, which is what it
+        // has always done. The storyboards hide it at the end of either hold, so this is
+        // never left to be taken back.
+        Toast.IsHitTestVisible = undoable;
+
+        var pop = (Storyboard)FindResource(undoable ? "ToastPopLong" : "ToastPop");
+        pop.Begin(this, isControllable: true);
+    }
+
+    // ---------- undo ----------
+
+    /// <summary>
+    /// What the last mutation did, and nothing before it. Rows it took out, each with the
+    /// index it came from; rows it put in, which come back out by reference.
+    ///
+    /// One step rather than a stack: the vault is a list you keep, not a document you work
+    /// on, and the mistake worth an escape hatch is the one you have just noticed. A stack
+    /// would also have to answer what an edit to a restored row means, and there is no
+    /// answer to that which is worth the weight.
+    /// </summary>
+    private (
+        string Label,
+        List<(SensProfile Profile, int Index)> Removed,
+        List<SensProfile> Added
+    )? _undo;
+
+    private void ToastUndo_Click(object sender, MouseButtonEventArgs e) => Undo();
+
+    /// <summary>
+    /// Puts the last step back.
+    ///
+    /// Ascending index order is what makes the rows land where they came from: every insert
+    /// shifts what is after it down by one, so walking up means each saved index is looking
+    /// at the same slot it left. Going down the other way would measure each index against a
+    /// list still missing the rows below it.
+    ///
+    /// The clamp is for a vault that has shrunk under the record. Nothing in the app can do
+    /// that -- every mutation replaces the record -- but an index past the end is an
+    /// exception rather than a misplaced row, and the end of the list is the nearest thing
+    /// to where it belongs.
+    /// </summary>
+    private void Undo()
+    {
+        if (_undo is not { } step)
+            return;
+
+        // A drag owns the collection's order until it lands, and rows put back into it
+        // mid-gesture would move the ground under the one being dragged. TryDeleteSelection
+        // stands off for the same reason.
+        if (_reorder.IsReordering)
+            return;
+
+        // An open editor has to be put away first. A refused commit leaves the vault as it
+        // is, and the step unspent, so it is still there to take once the cell is settled.
+        if (!Grid_.CommitEdit(DataGridEditingUnit.Row, exitEditingMode: true))
+            return;
+
+        // Taken, not read: there is one step and nothing behind it, so a second Ctrl+Z has
+        // nothing to do rather than something to do twice.
+        _undo = null;
+
+        foreach (var (profile, index) in step.Removed.OrderBy(r => r.Index))
+            _profiles.Insert(Math.Min(index, _profiles.Count), profile);
+
+        foreach (var profile in step.Added)
+            _profiles.Remove(profile);
+
+        Renumber();
+        RefreshView();
+        SetStatus($"Restored {step.Label}.");
+        ShowToast($"Restored {step.Label}");
     }
 
     // ---------- drag to reorder ----------
@@ -1008,6 +1232,13 @@ public partial class MainWindow : Window
         if (origin is null || !keep)
             return;
 
+        // A drop that stuck is a mutation like any other. The record's indices were taken
+        // against an order this drag has just changed, so they no longer point at the slots
+        // the rows came out of, and a Ctrl+Z afterwards would put them somewhere that means
+        // nothing. A cancelled drag never reaches here: it puts the row back first, which
+        // leaves the record describing the vault exactly as it did before the grab.
+        _undo = null;
+
         Renumber();
         var moved = origin.Value.Item;
         var label = string.IsNullOrWhiteSpace(moved.Name) ? moved.Label : $"\"{moved.Name}\"";
@@ -1023,22 +1254,53 @@ public partial class MainWindow : Window
 
     // ---------- convert ----------
 
-    private void Convert_Changed(object sender, RoutedEventArgs e) => RefreshConvert();
+    private void Convert_Changed(object sender, RoutedEventArgs e)
+    {
+        // Only the box that changed. Picking a game is not an answer to a complaint about
+        // the missing profile, and clearing both would take the red off a box nobody has
+        // touched since it was refused.
+        if (sender == FromBox)
+            ClearWarning(FromBox, FromError);
+        else if (sender == ToBox)
+            ClearWarning(ToBox, ToError);
 
+        RefreshConvert();
+    }
+
+    /// <summary>
+    /// Fills the panel in from what is picked: the summary under the source, the caption on
+    /// the card, the number, and the two lines under it. Everything it writes is either a
+    /// result or the prompt that stands in for one -- the card is never blank and never
+    /// shows a stale number beside an empty box.
+    /// </summary>
     private void RefreshConvert()
     {
         if (!_ready)
             return;
 
-        ConvResult.Text = "--";
-        ConvCm.Text = "";
-        ConvDot.Visibility = Visibility.Collapsed;
-        ConvDetail.Text = "";
-        ArmCopy(false);
+        var src = FromBox.SelectedItem as SensProfile;
+        var dst = ToBox.SelectedItem as Game;
 
-        if (FromBox.SelectedItem is not SensProfile src)
-            return;
-        if (ToBox.SelectedItem is not Game dst)
+        // The summary is about the profile, not about the conversion, so it comes up as soon
+        // as there is one -- before a target or a DPI has been chosen. A 1:1 profile is a
+        // distance already, and saying "64.9 sens at 0 DPI" about it would be three wrong
+        // numbers in a row.
+        FromSummary.Visibility = src is null ? Visibility.Collapsed : Visibility.Visible;
+        if (src is not null)
+            FromSummary.Text = src.Direct
+                ? $"{src.Cm360:F1} cm/360"
+                : $"{src.Sens:G6} sens at {src.Dpi:F0} DPI, {src.Cm360:F1} cm/360";
+
+        // Same for the card's caption: it names the target, which is known on its own. What
+        // it cannot name is a target that is not picked yet, so then it goes rather than
+        // holding a blank line open above the prompt.
+        ConvLabel.Visibility = dst is null ? Visibility.Collapsed : Visibility.Visible;
+        if (dst is not null)
+            ConvLabel.Text = dst.Direct ? "cm/360" : $"{dst.Name} sensitivity";
+
+        ShowConvResult(false);
+
+        if (src is null || dst is null)
             return;
 
         // A target of cm/360 needs no DPI to get there, so a blank one does not stop it.
@@ -1050,26 +1312,47 @@ public partial class MainWindow : Window
         if (sens <= 0)
             return;
 
-        // The conversion preserves cm/360 by definition, so the source's is the result's.
+        // G6, the same format the vault's SENS column uses, so the number on the card is
+        // the number the row will show once it is saved.
         ConvResult.Text = sens.ToString("G6");
-        ConvDetail.Text = dst.Direct ? dst.Name : $"{dst.Name} for {dpi:F0} DPI";
-        ArmCopy(true);
+        // The conversion preserves cm/360 by definition, so the source's is the result's.
+        ConvDetail.Text = $"{src.Cm360:F1} cm/360, same as {src.Label}";
+        ShowConvResult(true);
 
-        // Restating the distance next to a result that already is the distance would just be
-        // the same number twice.
+        // An answer on the card settles the one complaint the card can hold.
+        ConvError.Visibility = Visibility.Collapsed;
+
+        // A distance is not "at" a DPI: no DPI went into it, and the box's number played no
+        // part in what is on the card.
         if (dst.Direct)
+        {
+            ConvUnit.Visibility = Visibility.Collapsed;
             return;
+        }
 
-        ConvCm.Text = $"{src.Cm360:F1} cm/360";
-        ConvDot.Visibility = Visibility.Visible;
+        ConvUnit.Text = $"at {dpi:F0} DPI";
+    }
+
+    /// <summary>Swaps the result card between the answer and the prompt that stands in for
+    /// it. Both cannot be up at once: a number with "Pick a profile and a game." under it
+    /// would be describing something other than itself.</summary>
+    private void ShowConvResult(bool live)
+    {
+        var result = live ? Visibility.Visible : Visibility.Collapsed;
+        ConvResult.Visibility = result;
+        ConvUnit.Visibility = result;
+        ConvDetail.Visibility = result;
+        ConvEmpty.Visibility = live ? Visibility.Collapsed : Visibility.Visible;
+        ArmCopy(live);
     }
 
     /// <summary>Turns the result card's click-to-copy affordances on and off. A hand cursor
-    /// over a card reading "--" would be promising something there is nothing behind.</summary>
+    /// over a card that is asking for a profile would be promising something there is
+    /// nothing behind.</summary>
     private void ArmCopy(bool live)
     {
         ConvCard.Cursor = live ? Cursors.Hand : Cursors.Arrow;
-        ConvCard.ToolTip = live ? "Click to copy" : null;
+        ConvHint.Visibility = live ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void ConvCard_Click(object sender, MouseButtonEventArgs e)
@@ -1081,23 +1364,56 @@ public partial class MainWindow : Window
         Copy(ConvResult.Text);
     }
 
+    /// <summary>
+    /// Enter in any of the three fields does what Save to vault does, the same as the Create
+    /// panel's Enter and for the same reason: picking, typing a DPI and reaching for the
+    /// mouse is a step longer than the job needs.
+    ///
+    /// On the fields rather than on the panel, because the panel also holds the result card,
+    /// and PreviewKeyDown on the panel would take Enter from anything that lands in there
+    /// later. Handled is set only when the save actually ran.
+    /// </summary>
+    private void Convert_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+            return;
+
+        // An open list has first claim on Enter: it is how you take the entry under the
+        // highlight, which is most of what an editable game box is for.
+        if (sender is ComboBox { IsDropDownOpen: true })
+            return;
+
+        SaveConverted_Click(sender, e);
+        e.Handled = true;
+    }
+
     private void SaveConverted_Click(object sender, RoutedEventArgs e)
     {
         if (FromBox.SelectedItem is not SensProfile src || ToBox.SelectedItem is not Game dst)
         {
-            Warn("Pick a source profile and a target game.");
+            // One message, put at whichever half is missing -- and at the source first,
+            // because that is the half you fill in first.
+            const string missing = "Pick a source profile and a target game.";
+            if (FromBox.SelectedItem is SensProfile)
+                WarnAt(ToBox, ToError, missing);
+            else
+                WarnAt(FromBox, FromError, missing);
             return;
         }
         if (!TryNum(ToDpi.Text, out var dpi) && !dst.Direct)
         {
-            Warn("Target DPI must be a positive number.");
+            WarnAt(ToDpi, ToDpiError, "Target DPI must be a positive number.");
             return;
         }
 
         var sens = SensMath.SensFromCm360(dst.Direct, src.Cm360, dst.Yaw, dpi);
         if (sens <= 0)
         {
-            Warn("Nothing to convert yet.");
+            // The caption on its own, without WarnAt: this one is not about a field. It is
+            // the card saying it has nothing on it, and a card is a Border with no edge for
+            // FieldState to paint.
+            ConvError.Text = "Nothing to convert yet.";
+            ConvError.Visibility = Visibility.Visible;
             return;
         }
 
@@ -1114,6 +1430,11 @@ public partial class MainWindow : Window
                 Notes = $"Converted from {src.Label}",
             }
         );
+
+        // Same as a saved draft: a row the vault did not have a moment ago, and a record of
+        // an older step that no longer describes it.
+        _undo = null;
+        ClearConvertWarnings();
         SetStatus($"Converted to {dst.Name} at {src.Cm360:F1} cm/360.");
     }
 
@@ -1151,6 +1472,15 @@ public partial class MainWindow : Window
 
     private void Search_TextChanged(object sender, TextChangedEventArgs e) => RefreshView();
 
+    /// <summary>Puts both filters back, offered from the one place that knows they are
+    /// between you and every row you have. Each half raises its own change and either is
+    /// enough to bring the rows back; clearing both is what makes the offer true.</summary>
+    private void ClearSearch_Click(object sender, MouseButtonEventArgs e)
+    {
+        Search.Clear();
+        FilterBox.SelectedItem = AllGames;
+    }
+
     /// <summary>
     /// Re-runs the filter over the vault, or books it in for later if a cell is being edited.
     ///
@@ -1170,6 +1500,45 @@ public partial class MainWindow : Window
             return;
         }
         _view?.Refresh();
+        RefreshSummary();
+    }
+
+    /// <summary>
+    /// Everything that describes the vault rather than changes it: which empty state is up,
+    /// and the count on the status line. Both read the view rather than the list, because a
+    /// filter that has hidden every row and a vault with nothing in it are the same picture
+    /// otherwise -- and the way out of each of them is a different one.
+    /// </summary>
+    private void RefreshSummary()
+    {
+        // Reachable from a filter handler before the constructor has built the list, which
+        // is a vault that has not been loaded yet rather than an empty one. Everything below
+        // is named in the XAML, so this one guard covers the lot.
+        if (_profiles is null)
+            return;
+
+        var shown = Grid_.Items.Count;
+
+        EmptyVault.Visibility = _profiles.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        if (_profiles.Count > 0 && shown == 0)
+        {
+            // Whichever of the two you are holding. The search is the one being typed into
+            // when a grid empties out, so it answers first; with that box empty the only
+            // thing left that can have hidden everything is the game filter.
+            var term = Search.Text.Trim();
+            if (term.Length == 0)
+                term = FilterBox.SelectedItem as string ?? AllGames;
+
+            NoMatchText.Text = $"Nothing matches \"{term}\"";
+            NoMatch.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            NoMatch.Visibility = Visibility.Collapsed;
+        }
+
+        WriteStatus();
     }
 
     /// <summary>Closes out an edit and pays off whatever it deferred.</summary>
@@ -1196,6 +1565,7 @@ public partial class MainWindow : Window
                     _viewStale = false;
                     _view?.Refresh();
                 }
+                RefreshSummary();
             })
         );
     }
@@ -1383,6 +1753,7 @@ public partial class MainWindow : Window
         if (
             SettingsTitle is null
             || SettingsBlurb is null
+            || ThemeCurrentName is null
             || GeneralSettings is null
             || GamesSettings is null
             || ThemeSettings is null
@@ -1398,6 +1769,9 @@ public partial class MainWindow : Window
         GeneralSettings.Visibility = general ? Visibility.Visible : Visibility.Collapsed;
         GamesSettings.Visibility = games ? Visibility.Visible : Visibility.Collapsed;
         ThemeSettings.Visibility = themes ? Visibility.Visible : Visibility.Collapsed;
+
+        // Only the Themes page has a current theme worth naming in the header.
+        ThemeCurrentName.Visibility = themes ? Visibility.Visible : Visibility.Collapsed;
 
         // The blurb is the placeholder for a page with no controls yet; a page that has some
         // does not need to be told it is empty.
@@ -1497,6 +1871,12 @@ public partial class MainWindow : Window
         foreach (var card in _themes)
             card.Selected = ReferenceEquals(card.Theme, theme);
 
+        // Guarded for the same reason ShowSettingsPage is: the first call comes out of the
+        // constructor, and the header this writes to is built by the XAML rather than owned
+        // by the theme code.
+        if (ThemeCurrentName is not null)
+            ThemeCurrentName.Text = theme.Name;
+
         // No-op until the window has a handle; the SourceInitialized hook covers the first
         // call, and every later one comes through here.
         TitleBar.Apply(this, theme);
@@ -1531,8 +1911,44 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (e.Key == Key.Escape && TryEscape())
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (Keyboard.Modifiers != ModifierKeys.Control)
             return;
+
+        // The three that are not zoom. Each of them either moves the keyboard somewhere or
+        // changes the vault, so each answers for the keystroke itself rather than falling
+        // through to the step below.
+        if (e.Key == Key.F)
+        {
+            FocusSearch();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.N)
+        {
+            FocusDraft();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Z)
+        {
+            // Wherever text is being typed the caret has an undo of its own, and it is a far
+            // smaller thing to be asking for than the vault's. Left unhandled, so the box
+            // gets the keystroke exactly as it would anywhere else in Windows.
+            if (Typing())
+                return;
+
+            Undo();
+            e.Handled = true;
+            return;
+        }
 
         // Both rows of keys: OemPlus/OemMinus on the main block, Add/Subtract on the numpad.
         // D0 and NumPad0 reset, matching what every browser does.
@@ -1552,6 +1968,70 @@ public partial class MainWindow : Window
 
         Save();
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// Ctrl+F. The bar can be folded away, and a shortcut that put the caret in a box nobody
+    /// can see would be no shortcut at all -- so it comes back first, through the same call
+    /// the show button makes, which is what keeps the window's own floor right.
+    ///
+    /// Select-all rather than a caret at the end: what follows Ctrl+F is a new search far
+    /// more often than a correction to the last one, and this way either one costs nothing.
+    /// </summary>
+    private void FocusSearch()
+    {
+        if (FilterBar.Visibility != Visibility.Visible)
+            ShowFilterBar(true);
+
+        Search.Focus();
+        Search.SelectAll();
+    }
+
+    /// <summary>
+    /// Ctrl+N. Same story as Ctrl+F for the panel the Create tab sits on, and one more
+    /// besides: a tab's content is built on the layout pass that follows the pick, and a box
+    /// that is not in the tree yet cannot take focus. Hence the forced pass between them.
+    /// </summary>
+    private void FocusDraft()
+    {
+        if (LeftPanel.Visibility != Visibility.Visible)
+            ShowLeftPanel(true);
+
+        Tabs.SelectedIndex = 0;
+        Tabs.UpdateLayout();
+        NameBox.Focus();
+    }
+
+    /// <summary>
+    /// Esc, and what it takes back depends on what is holding something. The search box
+    /// first, because a filter is the thing most often standing between you and the rows;
+    /// then the selection, which is the other thing on screen that Esc is expected to drop.
+    ///
+    /// Three things own Esc outright and are left it: an open cell editor, where it reverts
+    /// the cell; a drag in flight, where it puts the row back (RowReorder hooks this same
+    /// window event, and is registered after this handler); and an open drop-down, where it
+    /// closes the list. The game box in the entry panel is the third of those, which is why
+    /// this asks about the combo as well as the cell.
+    /// </summary>
+    private bool TryEscape()
+    {
+        if (EditingCell() || _reorder.IsReordering)
+            return false;
+        if (Rows.Parent<ComboBox>(Keyboard.FocusedElement) is { IsDropDownOpen: true })
+            return false;
+
+        if (Search.IsKeyboardFocusWithin && Search.Text.Length > 0)
+        {
+            Search.Clear();
+            return true;
+        }
+
+        if (Grid_.SelectedItems.Count == 0)
+            return false;
+
+        Grid_.UnselectAll();
+        Grid_.CurrentCell = default;
+        return true;
     }
 
     private void Window_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
@@ -1766,6 +2246,16 @@ public partial class MainWindow : Window
 
     // ---------- status line ----------
 
+    /// <summary>The last thing the app did, held on to so the count in front of it can be
+    /// rewritten without taking it away. The line says two things at once -- what the vault
+    /// holds, and what just happened to it -- and only one of them has an event behind
+    /// it.</summary>
+    private string _action = "";
+
+    /// <summary>Set while the line is holding a refusal, so a filter that refreshes the
+    /// count a keystroke later does not talk over it.</summary>
+    private bool _warned;
+
     // SetResourceReference, not an assignment of what FindResource returned. FindResource
     // hands back the brush that is in the dictionary now, and a theme change replaces it --
     // so an assigned brush is a snapshot, and the status line would be the one piece of text
@@ -1775,14 +2265,102 @@ public partial class MainWindow : Window
 
     private void SetStatus(string text)
     {
+        _action = text;
+        _warned = false;
         Status.SetResourceReference(TextBlock.ForegroundProperty, "Overlay0");
-        Status.Text = $"{text}   │   {_profiles.Count} saved";
+        RefreshSummary();
     }
 
     private void Warn(string text)
     {
+        _warned = true;
         Status.SetResourceReference(TextBlock.ForegroundProperty, "Red");
         Status.Text = text;
+    }
+
+    /// <summary>
+    /// The count, and after it whatever was last done.
+    ///
+    /// The count rather than the path to data.json, which is what stood here before. That
+    /// path is the same string every time you look at it, it is already on the settings page
+    /// beside the button that opens the folder, and it answered a question nobody standing
+    /// in front of the vault was asking. How much is in here, and how much of it you are
+    /// being shown, is one the window cannot answer on its own: a filtered grid and a small
+    /// vault look exactly alike.
+    /// </summary>
+    private void WriteStatus()
+    {
+        if (_warned)
+            return;
+
+        var total = _profiles.Count;
+        var shown = Grid_.Items.Count;
+        var count = shown == total ? Count(total) : $"{shown} of {total} shown";
+
+        Status.Text = _action.Length == 0 ? count : $"{count}   │   {_action}";
+    }
+
+    /// <summary>
+    /// Says no at the field instead of on the status line: reds the field's edge and writes
+    /// the reason under it. A complaint about one box belongs beside that box. The status
+    /// line is in the far bottom corner of a window that can be 1180 wide, which is nowhere
+    /// near where anyone is looking when a number they have just typed is refused.
+    ///
+    /// The status line keeps everything that is not about a particular box -- a clipboard
+    /// that would not open, a folder that would not, a file that would not save.
+    ///
+    /// A Control rather than a TextBox: the edge is painted from FieldState, which the combo
+    /// box style reads as well.
+    /// </summary>
+    private void WarnAt(Control field, TextBlock caption, string message)
+    {
+        // Nothing reaches this before the window is up -- only a Save can -- but a pair of
+        // helpers that write and unwrite the same two elements should not have one rule each.
+        if (field is null || caption is null)
+            return;
+
+        FieldState.SetIsInvalid(field, true);
+        caption.Text = message;
+        caption.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>
+    /// Takes back what <see cref="WarnAt"/> said. The message is left in place, so a
+    /// complaint that comes straight back does not blink through empty.
+    ///
+    /// Guarded because it runs before the window is built. SensBox carries Text="1" in the
+    /// XAML, and assigning that raises its TextChanged while the panel is still being parsed
+    /// -- at which point the box itself exists but the caption under it, declared after it,
+    /// is still null. Same hazard and same answer as Tabs_SelectionChanged and
+    /// ShowSettingsPage: check the elements, not a readiness flag, because the constructor
+    /// legitimately calls into this side of the panel before it sets one.
+    /// </summary>
+    private static void ClearWarning(Control field, TextBlock caption)
+    {
+        if (field is null || caption is null)
+            return;
+
+        FieldState.SetIsInvalid(field, false);
+        caption.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>Every complaint the Create panel is holding, for a save that got through.</summary>
+    private void ClearDraftWarnings()
+    {
+        ClearWarning(SensBox, SensError);
+        ClearWarning(DpiBox, DpiError);
+        ClearWarning(CmBox, CmError);
+    }
+
+    /// <summary>The same, for the Convert panel. Its own method rather than three more lines
+    /// in the one above, because a save on one panel says nothing about what the other is
+    /// holding.</summary>
+    private void ClearConvertWarnings()
+    {
+        ClearWarning(FromBox, FromError);
+        ClearWarning(ToBox, ToError);
+        ClearWarning(ToDpi, ToDpiError);
+        ConvError.Visibility = Visibility.Collapsed;
     }
 
     private static double ParseOrZero(string? s) =>
