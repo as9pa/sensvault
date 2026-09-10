@@ -347,6 +347,15 @@ public partial class MainWindow : Window
 
         ApplyDirectMode();
         Resync();
+
+        // A refusal was about the game that was picked when Save was pressed, so it goes when
+        // that game does. It cannot be left to the boxes' own TextChanged to settle: Resync
+        // writes them through SetText, which no-ops when the text has not actually changed.
+        // Refuse an empty sens box, then pick a 1:1 game, and Resync computes a sens of zero
+        // and writes the "" that is already there -- no TextChanged, no clear, and the box is
+        // left read-only, red, and carrying a message there is no longer any way to act on.
+        // The mirror is a stale cm/360 complaint sitting under "Pick a game first".
+        ClearDraftWarnings();
         UpdateCmPlaceholder();
     }
 
