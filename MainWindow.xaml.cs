@@ -167,7 +167,7 @@ public partial class MainWindow : Window
         Closing += (_, _) => Save();
 
         _ready = true;
-        SetStatus(Store.FilePath);
+        RefreshSummary();
 
         // TEMP probe
         Loaded += (_, _) =>
@@ -1237,6 +1237,15 @@ public partial class MainWindow : Window
 
     private void Search_TextChanged(object sender, TextChangedEventArgs e) => RefreshView();
 
+    /// <summary>Puts both filters back, offered from the one place that knows they are
+    /// between you and every row you have. Each half raises its own change and either is
+    /// enough to bring the rows back; clearing both is what makes the offer true.</summary>
+    private void ClearSearch_Click(object sender, MouseButtonEventArgs e)
+    {
+        Search.Clear();
+        FilterBox.SelectedItem = AllGames;
+    }
+
     /// <summary>
     /// Re-runs the filter over the vault, or books it in for later if a cell is being edited.
     ///
@@ -1256,6 +1265,45 @@ public partial class MainWindow : Window
             return;
         }
         _view?.Refresh();
+        RefreshSummary();
+    }
+
+    /// <summary>
+    /// Everything that describes the vault rather than changes it: which empty state is up,
+    /// and the count on the status line. Both read the view rather than the list, because a
+    /// filter that has hidden every row and a vault with nothing in it are the same picture
+    /// otherwise -- and the way out of each of them is a different one.
+    /// </summary>
+    private void RefreshSummary()
+    {
+        // Reachable from a filter handler before the constructor has built the list, which
+        // is a vault that has not been loaded yet rather than an empty one. Everything below
+        // is named in the XAML, so this one guard covers the lot.
+        if (_profiles is null)
+            return;
+
+        var shown = Grid_.Items.Count;
+
+        EmptyVault.Visibility = _profiles.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        if (_profiles.Count > 0 && shown == 0)
+        {
+            // Whichever of the two you are holding. The search is the one being typed into
+            // when a grid empties out, so it answers first; with that box empty the only
+            // thing left that can have hidden everything is the game filter.
+            var term = Search.Text.Trim();
+            if (term.Length == 0)
+                term = FilterBox.SelectedItem as string ?? AllGames;
+
+            NoMatchText.Text = $"Nothing matches \"{term}\"";
+            NoMatch.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            NoMatch.Visibility = Visibility.Collapsed;
+        }
+
+        WriteStatus();
     }
 
     /// <summary>Closes out an edit and pays off whatever it deferred.</summary>
@@ -1282,6 +1330,7 @@ public partial class MainWindow : Window
                     _viewStale = false;
                     _view?.Refresh();
                 }
+                RefreshSummary();
             })
         );
     }
@@ -1852,6 +1901,16 @@ public partial class MainWindow : Window
 
     // ---------- status line ----------
 
+    /// <summary>The last thing the app did, held on to so the count in front of it can be
+    /// rewritten without taking it away. The line says two things at once -- what the vault
+    /// holds, and what just happened to it -- and only one of them has an event behind
+    /// it.</summary>
+    private string _action = "";
+
+    /// <summary>Set while the line is holding a refusal, so a filter that refreshes the
+    /// count a keystroke later does not talk over it.</summary>
+    private bool _warned;
+
     // SetResourceReference, not an assignment of what FindResource returned. FindResource
     // hands back the brush that is in the dictionary now, and a theme change replaces it --
     // so an assigned brush is a snapshot, and the status line would be the one piece of text
@@ -1861,14 +1920,39 @@ public partial class MainWindow : Window
 
     private void SetStatus(string text)
     {
+        _action = text;
+        _warned = false;
         Status.SetResourceReference(TextBlock.ForegroundProperty, "Overlay0");
-        Status.Text = $"{text}   │   {_profiles.Count} saved";
+        RefreshSummary();
     }
 
     private void Warn(string text)
     {
+        _warned = true;
         Status.SetResourceReference(TextBlock.ForegroundProperty, "Red");
         Status.Text = text;
+    }
+
+    /// <summary>
+    /// The count, and after it whatever was last done.
+    ///
+    /// The count rather than the path to data.json, which is what stood here before. That
+    /// path is the same string every time you look at it, it is already on the settings page
+    /// beside the button that opens the folder, and it answered a question nobody standing
+    /// in front of the vault was asking. How much is in here, and how much of it you are
+    /// being shown, is one the window cannot answer on its own: a filtered grid and a small
+    /// vault look exactly alike.
+    /// </summary>
+    private void WriteStatus()
+    {
+        if (_warned)
+            return;
+
+        var total = _profiles.Count;
+        var shown = Grid_.Items.Count;
+        var count = shown == total ? Count(total) : $"{shown} of {total} shown";
+
+        Status.Text = _action.Length == 0 ? count : $"{count}   │   {_action}";
     }
 
     /// <summary>

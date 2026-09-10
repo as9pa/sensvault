@@ -49,9 +49,24 @@
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
 
+        <!-- Figures of one width, so the digits in a column stand over one another
+             instead of drifting sideways a pixel at a time as the numbers change. Only the
+             number columns and the number fields wear it: a name is not a column of
+             figures, and tabular spacing inside a word is just wide letters. -->
+        <Style x:Key="Figures" TargetType="TextBlock">
+            <Setter Property="Typography.NumeralAlignment" Value="Tabular"/>
+        </Style>
+
+        <!-- The same, for the editor a number column opens, so the number does not shift
+             under the caret the moment you double-click it. -->
+        <Style x:Key="FigureEditor" TargetType="TextBox" BasedOn="{StaticResource CellEditor}">
+            <Setter Property="Typography.NumeralAlignment" Value="Tabular"/>
+        </Style>
+
         <!-- Cells you can click to copy. Both the sens and the cm/360 carry it, so the
-             cursor and tooltip are declared once. -->
-        <Style x:Key="Copyable" TargetType="TextBlock">
+             cursor and tooltip are declared once. Both hold numbers as well, which is what
+             the figures above are inherited for. -->
+        <Style x:Key="Copyable" TargetType="TextBlock" BasedOn="{StaticResource Figures}">
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="ToolTip" Value="Click to copy"/>
         </Style>
@@ -109,7 +124,9 @@
                                          1:1 one, where there is no in-game sensitivity to speak
                                          of. It keeps showing the number, because for those the
                                          sens and the cm/360 are the same one. -->
-                                    <TextBox x:Name="SensBox" Text="1" TextChanged="SensBox_TextChanged"/>
+                                    <TextBox x:Name="SensBox" Text="1"
+                                             Typography.NumeralAlignment="Tabular"
+                                             TextChanged="SensBox_TextChanged"/>
                                     <!-- Where the app says no about this box. Collapsed until
                                          WarnAt fills it in, so it costs no height until there
                                          is something to say. -->
@@ -120,7 +137,9 @@
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
                                     <TextBlock Text="DPI" Style="{StaticResource Label}"/>
-                                    <TextBox x:Name="DpiBox" TextChanged="DpiBox_TextChanged"/>
+                                    <TextBox x:Name="DpiBox"
+                                             Typography.NumeralAlignment="Tabular"
+                                             TextChanged="DpiBox_TextChanged"/>
                                     <TextBlock x:Name="DpiError" Visibility="Collapsed"
                                                FontSize="{StaticResource FontCaption}"
                                                Foreground="{DynamicResource Red}"
@@ -176,7 +195,9 @@
 
                             <TextBlock Text="cm/360" Style="{StaticResource Label}" Margin="0,0,0,4"/>
                             <Grid>
-                                <TextBox x:Name="CmBox" TextChanged="CmBox_TextChanged"/>
+                                <TextBox x:Name="CmBox"
+                                         Typography.NumeralAlignment="Tabular"
+                                         TextChanged="CmBox_TextChanged"/>
                                 <!-- Laid over the box rather than put in it, because the box's
                                      text is the draft's number and a prompt written into it
                                      would be parsed as one. Not hit-testable, so a click still
@@ -308,7 +329,12 @@
                 <Grid Grid.Row="0" x:Name="FilterBar" Margin="0,0,0,12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="200"/>
+                        <!-- The game filter sizes to what it is showing rather than to a
+                             width picked once. At a fixed 200 it sat mostly empty on "All
+                             games" and on most of the names in it, and a custom game with a
+                             longer name than that still had nowhere to go. Its own MinWidth
+                             is the floor. -->
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
@@ -331,7 +357,8 @@
                         </Path>
                     </Button>
 
-                    <ComboBox Grid.Column="1" x:Name="FilterBox" IsSynchronizedWithCurrentItem="False"
+                    <ComboBox Grid.Column="1" x:Name="FilterBox" MinWidth="120"
+                              IsSynchronizedWithCurrentItem="False"
                               MaxDropDownHeight="380" SelectionChanged="Filter_Changed"/>
 
                     <ToggleButton Grid.Column="2" x:Name="ColumnsButton" Width="34" Margin="8,0,0,0"
@@ -358,6 +385,8 @@
                     </ToggleButton>
 
                     <TextBox Grid.Column="3" x:Name="Search" Margin="8,0,0,0"
+                             Style="{StaticResource SearchBox}"
+                             local:Chrome.Placeholder="Search name or game"
                              TextChanged="Search_TextChanged"
                              ToolTip="Filter by name or game"/>
 
@@ -484,11 +513,13 @@
                         <DataGridTextColumn x:Name="SensColumn" Header="SENS"
                                             Binding="{Binding Sens, StringFormat={}{0:G6}}"
                                             Width="92" MinWidth="76"
+                                            CellStyle="{StaticResource CopyCell}"
                                             ElementStyle="{StaticResource Copyable}"
-                                            EditingElementStyle="{StaticResource CellEditor}"/>
+                                            EditingElementStyle="{StaticResource FigureEditor}"/>
                         <DataGridTextColumn x:Name="DpiColumn" Header="DPI" Binding="{Binding Dpi}"
                                             Width="80" MinWidth="64"
-                                            EditingElementStyle="{StaticResource CellEditor}"/>
+                                            ElementStyle="{StaticResource Figures}"
+                                            EditingElementStyle="{StaticResource FigureEditor}"/>
                         <!-- Bound to the pre-formatted string, not the double: a row saved
                              with no game has no cm/360 to show and the text is empty there,
                              where a numeric binding could only render a misleading 0.0.
@@ -496,7 +527,8 @@
                              column still orders 9 before 10. -->
                         <DataGridTextColumn x:Name="CmColumn" Header="CM/360"
                                             Binding="{Binding Cm360Text}" SortMemberPath="Cm360"
-                                            IsReadOnly="True" Width="96" MinWidth="82">
+                                            IsReadOnly="True" Width="96" MinWidth="82"
+                                            CellStyle="{StaticResource CopyCell}">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock" BasedOn="{StaticResource Copyable}">
                                     <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
@@ -537,6 +569,45 @@
                     </Path>
                 </Button>
                 </Grid>
+
+                <!-- What the grid says when it is showing nothing. Two of them, because "you
+                     have not saved anything yet" and "nothing here matches what you asked
+                     for" are different problems with different ways out, and the one thing
+                     an empty table must not do is leave you working out which one you have.
+
+                     Over the grid rather than in it: a DataGrid with no rows still owns its
+                     headers and its scrollbars, and there is no row to write any of this
+                     into. Nothing here takes the mouse except the link, so a click or a
+                     right-click still reaches the grid underneath. -->
+                <StackPanel Grid.Row="1" x:Name="EmptyVault" Visibility="Collapsed"
+                            IsHitTestVisible="False"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="No sensitivities yet" FontSize="{StaticResource FontBody}"
+                               Foreground="{DynamicResource Text}" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Save one from the Create panel, or paste rows you copied from another vault."
+                               FontSize="{StaticResource FontSecondary}"
+                               Foreground="{DynamicResource Subtext}" TextAlignment="Center"
+                               MaxWidth="300" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" x:Name="NoMatch" Visibility="Collapsed"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <!-- Filled in by RefreshSummary, which is the only place that knows
+                         whether it was the search or the game filter that emptied the
+                         grid. -->
+                    <TextBlock x:Name="NoMatchText" IsHitTestVisible="False"
+                               FontSize="{StaticResource FontBody}"
+                               Foreground="{DynamicResource Text}" TextAlignment="Center"
+                               MaxWidth="300" TextWrapping="Wrap"/>
+                    <!-- The way out, next to the sentence that says you need one.
+                         Transparent so the whole line takes the click rather than only the
+                         letters of it. -->
+                    <TextBlock x:Name="ClearSearch" Text="Clear search" Background="Transparent"
+                               FontSize="{StaticResource FontSecondary}"
+                               Foreground="{DynamicResource Accent}" Cursor="Hand"
+                               HorizontalAlignment="Center" Margin="0,6,0,0"
+                               MouseLeftButtonUp="ClearSearch_Click"/>
+                </StackPanel>
 
                 <Border Grid.Row="1" x:Name="Toast" Opacity="0" IsHitTestVisible="False"
                         HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,24"
@@ -581,7 +652,7 @@
 
                     <CheckBox x:Name="NoStatusBar" Content="Hide the status bar"
                               Margin="0,8,0,0" Click="NoStatusBar_Click"/>
-                    <TextBlock Text="Takes back the line under the vault. Warnings show up there too, so with it hidden a refused save says nothing at all."
+                    <TextBlock Text="Takes back the line under the vault."
                                FontSize="{StaticResource FontSecondary}" Foreground="{DynamicResource Overlay0}"
                                Margin="24,4,0,0" TextWrapping="Wrap" MaxWidth="420"
                                HorizontalAlignment="Left"/>
