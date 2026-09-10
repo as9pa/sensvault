@@ -292,52 +292,168 @@
                                        FontSize="{StaticResource FontCaption}"
                                        Text="Convert a sensitivity to another game."/>
 
-                            <TextBlock Text="From Profile" Style="{StaticResource Label}"/>
+                            <TextBlock Text="From profile" Style="{StaticResource Label}"/>
                             <ComboBox x:Name="FromBox" DisplayMemberPath="Label"
                                       IsSynchronizedWithCurrentItem="False"
                                       MaxDropDownHeight="380"
+                                      PreviewKeyDown="Convert_PreviewKeyDown"
                                       SelectionChanged="Convert_Changed"/>
+                            <!-- What the picked profile actually is. The drop-down offers
+                                 names, and a name is not a number: this is how you tell the
+                                 "cs" you keep from the "cs" you saved on the old mouse,
+                                 without opening the row up in the vault to check. -->
+                            <TextBlock x:Name="FromSummary" Visibility="Collapsed"
+                                       Foreground="{DynamicResource Subtext}"
+                                       FontSize="{StaticResource FontCaption}"
+                                       Typography.NumeralAlignment="Tabular"
+                                       Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            <!-- Never up at the same time as the summary above it: the box is
+                                 only refused while nothing is picked in it. -->
+                            <TextBlock x:Name="FromError" Visibility="Collapsed"
+                                       FontSize="{StaticResource FontCaption}"
+                                       Foreground="{DynamicResource Red}"
+                                       Margin="0,4,0,0" TextWrapping="Wrap"/>
 
-                            <TextBlock Text="To Game" Style="{StaticResource Label}"/>
-                            <ComboBox x:Name="ToBox" IsSynchronizedWithCurrentItem="False"
-                                      IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
-                                      MaxDropDownHeight="380"
-                                      SelectionChanged="Convert_Changed"/>
+                            <!-- Which way the number is going, drawn rather than said. The
+                                 Create tab's divider carries two arrows passing because its
+                                 boxes write to each other; this one runs one way only, so it
+                                 is one arrow and it points at the half being filled in.
+                                 Decorative, so no tooltip and no hit area: there is nothing
+                                 here to click and nothing it could explain. -->
+                            <Grid Margin="0,16,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Height="1" VerticalAlignment="Center"
+                                        Background="{DynamicResource Surface0}"/>
+                                <Path Grid.Column="1" Data="{StaticResource ArrowDownIcon}"
+                                      Width="14" Height="14" Stretch="Uniform" Margin="8,0"
+                                      Stroke="{DynamicResource Overlay0}" StrokeThickness="1.6"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"/>
+                                <Border Grid.Column="2" Height="1" VerticalAlignment="Center"
+                                        Background="{DynamicResource Surface0}"/>
+                            </Grid>
 
-                            <TextBlock Text="Target DPI" Style="{StaticResource Label}"/>
-                            <TextBox x:Name="ToDpi" TextChanged="ToDpi_TextChanged"/>
-
-                            <!-- The whole card copies, not a button on it: the converted number
-                                 is the one thing this tab exists to hand you. The cursor and
-                                 tooltip are armed from RefreshConvert so they only appear when
-                                 there is actually a result under them. -->
-                            <Border x:Name="ConvCard" Background="{DynamicResource Surface0}"
-                                    CornerRadius="{DynamicResource RadCard}" Padding="12,10" Margin="0,16,0,0"
-                                    MouseLeftButtonUp="ConvCard_Click">
-                                <StackPanel>
-                                    <TextBlock Text="Converted Sensitivity" Style="{StaticResource Label}"
-                                               Margin="0,0,0,4"/>
-                                    <!-- Bottom-aligned rather than centred: the cm/360 is a
-                                         footnote to the number, so it sits on its baseline. -->
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock x:Name="ConvResult" Foreground="{DynamicResource Text}"
-                                                   FontSize="{StaticResource FontDisplay}" FontWeight="Bold" Text="--"
-                                                   VerticalAlignment="Bottom"/>
-                                        <TextBlock x:Name="ConvDot" Text="&#183;" FontSize="{StaticResource FontTitle}"
-                                                   Foreground="{DynamicResource Overlay0}"
-                                                   Margin="8,0,8,1" VerticalAlignment="Bottom"
-                                                   Visibility="Collapsed"/>
-                                        <TextBlock x:Name="ConvCm" Foreground="{DynamicResource Subtext}"
-                                                   FontSize="{StaticResource FontBody}" Margin="0,0,0,4"
-                                                   VerticalAlignment="Bottom"/>
-                                    </StackPanel>
-                                    <TextBlock x:Name="ConvDetail" Foreground="{DynamicResource Subtext}"
+                            <!-- The target on one line, because it is one thing: which game,
+                                 and the DPI you are asking for it at. -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="86"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <StackPanel Grid.Row="0" Grid.Column="0">
+                                    <TextBlock Text="To game" Style="{StaticResource Label}"/>
+                                    <ComboBox x:Name="ToBox" IsSynchronizedWithCurrentItem="False"
+                                              IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
+                                              MaxDropDownHeight="380"
+                                              PreviewKeyDown="Convert_PreviewKeyDown"
+                                              SelectionChanged="Convert_Changed"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="0" Grid.Column="2">
+                                    <TextBlock Text="Target DPI" Style="{StaticResource Label}"/>
+                                    <TextBox x:Name="ToDpi"
+                                             Typography.NumeralAlignment="Tabular"
+                                             PreviewKeyDown="Convert_PreviewKeyDown"
+                                             TextChanged="ToDpi_TextChanged"/>
+                                </StackPanel>
+                                <!-- Both complaints sit under the pair rather than under
+                                     their own box. The DPI's is a sentence and its box is 86
+                                     wide, and a sentence set five words deep in a red column
+                                     is harder to read than the thing it is refusing. The red
+                                     edge is what says which box it means, and only one of the
+                                     two is ever up: the save stops at the first refusal. -->
+                                <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3">
+                                    <TextBlock x:Name="ToError" Visibility="Collapsed"
                                                FontSize="{StaticResource FontCaption}"
+                                               Foreground="{DynamicResource Red}"
+                                               Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="ToDpiError" Visibility="Collapsed"
+                                               FontSize="{StaticResource FontCaption}"
+                                               Foreground="{DynamicResource Red}"
                                                Margin="0,4,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
-                            </Border>
+                            </Grid>
 
-                            <Button Content="Convert" Click="SaveConverted_Click" Margin="0,16,0,0"/>
+                            <!-- The whole card copies, not a button on it: the converted
+                                 number is the one thing this tab exists to hand you. The
+                                 cursor and the hint are armed from RefreshConvert so they
+                                 only appear when there is actually a result under them. -->
+                            <Border x:Name="ConvCard" Background="{DynamicResource Surface0}"
+                                    CornerRadius="{DynamicResource RadCard}" Padding="12" Margin="0,16,0,0"
+                                    MouseLeftButtonUp="ConvCard_Click">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <!-- Names the target rather than the act: "Valorant
+                                             sensitivity" is what you are about to go and type
+                                             into Valorant. -->
+                                        <TextBlock x:Name="ConvLabel" Visibility="Collapsed"
+                                                   Foreground="{DynamicResource Subtext}"
+                                                   FontSize="{StaticResource FontCaption}"
+                                                   Margin="0,0,0,4" TextWrapping="Wrap"/>
+                                        <!-- The card is never blank: with nothing to convert
+                                             it says what it is waiting for. -->
+                                        <TextBlock x:Name="ConvEmpty" Text="Pick a profile and a game."
+                                                   Foreground="{DynamicResource Overlay0}"
+                                                   FontSize="{StaticResource FontSecondary}"
+                                                   TextWrapping="Wrap"/>
+                                        <!-- Bottom-aligned rather than centred: the DPI is a
+                                             footnote to the number, so it sits on its baseline. -->
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock x:Name="ConvResult" Visibility="Collapsed"
+                                                       Foreground="{DynamicResource TextStrong}"
+                                                       FontSize="{StaticResource FontDisplay}"
+                                                       FontWeight="SemiBold"
+                                                       Typography.NumeralAlignment="Tabular"
+                                                       VerticalAlignment="Bottom"/>
+                                            <TextBlock x:Name="ConvUnit" Visibility="Collapsed"
+                                                       Foreground="{DynamicResource Text}"
+                                                       FontSize="{StaticResource FontSecondary}"
+                                                       Margin="6,0,0,4" VerticalAlignment="Bottom"/>
+                                        </StackPanel>
+                                        <TextBlock x:Name="ConvDetail" Visibility="Collapsed"
+                                                   Foreground="{DynamicResource Subtext}"
+                                                   FontSize="{StaticResource FontCaption}"
+                                                   Margin="0,8,0,0" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <!-- The hint the card used to keep in a tooltip. A tooltip
+                                         is only read by someone who already suspected the card
+                                         did something and held the pointer still to find out. -->
+                                    <StackPanel x:Name="ConvHint" Grid.Column="1" Visibility="Collapsed"
+                                                Orientation="Horizontal" VerticalAlignment="Top">
+                                        <Path Data="{StaticResource CopyIcon}"
+                                              Width="12" Height="12" Stretch="Uniform"
+                                              Stroke="{DynamicResource Overlay0}" StrokeThickness="1.6"
+                                              StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                              StrokeLineJoin="Round" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Click to copy" Margin="6,0,0,0"
+                                                   Foreground="{DynamicResource Overlay0}"
+                                                   FontSize="{StaticResource FontCaption}"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                            <!-- The one refusal that is about the card and not about a box:
+                                 nothing to draw a red edge on, so it is the line alone. -->
+                            <TextBlock x:Name="ConvError" Visibility="Collapsed"
+                                       FontSize="{StaticResource FontCaption}"
+                                       Foreground="{DynamicResource Red}"
+                                       Margin="0,4,0,0" TextWrapping="Wrap"/>
+
+                            <!-- The one thing this panel is for, so it wears the accent. -->
+                            <Button Content="Save to vault" Style="{StaticResource PrimaryButton}"
+                                    Click="SaveConverted_Click" Margin="0,16,0,0"/>
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>

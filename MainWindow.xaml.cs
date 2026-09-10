@@ -451,6 +451,11 @@ public partial class MainWindow : Window
 
     private void ToDpi_TextChanged(object sender, TextChangedEventArgs e)
     {
+        // Ahead of the sync guard, for the reason the handler above gives: a figure the
+        // Create tab mirrored in here answers "Target DPI must be a positive number" just as
+        // well as a typed one does.
+        ClearWarning(ToDpi, ToDpiError);
+
         if (_syncing)
             return;
         DpiEntered(ToDpi, DpiBox);
@@ -1237,22 +1242,53 @@ public partial class MainWindow : Window
 
     // ---------- convert ----------
 
-    private void Convert_Changed(object sender, RoutedEventArgs e) => RefreshConvert();
+    private void Convert_Changed(object sender, RoutedEventArgs e)
+    {
+        // Only the box that changed. Picking a game is not an answer to a complaint about
+        // the missing profile, and clearing both would take the red off a box nobody has
+        // touched since it was refused.
+        if (sender == FromBox)
+            ClearWarning(FromBox, FromError);
+        else if (sender == ToBox)
+            ClearWarning(ToBox, ToError);
 
+        RefreshConvert();
+    }
+
+    /// <summary>
+    /// Fills the panel in from what is picked: the summary under the source, the caption on
+    /// the card, the number, and the two lines under it. Everything it writes is either a
+    /// result or the prompt that stands in for one -- the card is never blank and never
+    /// shows a stale number beside an empty box.
+    /// </summary>
     private void RefreshConvert()
     {
         if (!_ready)
             return;
 
-        ConvResult.Text = "--";
-        ConvCm.Text = "";
-        ConvDot.Visibility = Visibility.Collapsed;
-        ConvDetail.Text = "";
-        ArmCopy(false);
+        var src = FromBox.SelectedItem as SensProfile;
+        var dst = ToBox.SelectedItem as Game;
 
-        if (FromBox.SelectedItem is not SensProfile src)
-            return;
-        if (ToBox.SelectedItem is not Game dst)
+        // The summary is about the profile, not about the conversion, so it comes up as soon
+        // as there is one -- before a target or a DPI has been chosen. A 1:1 profile is a
+        // distance already, and saying "64.9 sens at 0 DPI" about it would be three wrong
+        // numbers in a row.
+        FromSummary.Visibility = src is null ? Visibility.Collapsed : Visibility.Visible;
+        if (src is not null)
+            FromSummary.Text = src.Direct
+                ? $"{src.Cm360:F1} cm/360"
+                : $"{src.Sens:G6} sens at {src.Dpi:F0} DPI, {src.Cm360:F1} cm/360";
+
+        // Same for the card's caption: it names the target, which is known on its own. What
+        // it cannot name is a target that is not picked yet, so then it goes rather than
+        // holding a blank line open above the prompt.
+        ConvLabel.Visibility = dst is null ? Visibility.Collapsed : Visibility.Visible;
+        if (dst is not null)
+            ConvLabel.Text = dst.Direct ? "cm/360" : $"{dst.Name} sensitivity";
+
+        ShowConvResult(false);
+
+        if (src is null || dst is null)
             return;
 
         // A target of cm/360 needs no DPI to get there, so a blank one does not stop it.
@@ -1264,26 +1300,47 @@ public partial class MainWindow : Window
         if (sens <= 0)
             return;
 
-        // The conversion preserves cm/360 by definition, so the source's is the result's.
+        // G6, the same format the vault's SENS column uses, so the number on the card is
+        // the number the row will show once it is saved.
         ConvResult.Text = sens.ToString("G6");
-        ConvDetail.Text = dst.Direct ? dst.Name : $"{dst.Name} for {dpi:F0} DPI";
-        ArmCopy(true);
+        // The conversion preserves cm/360 by definition, so the source's is the result's.
+        ConvDetail.Text = $"{src.Cm360:F1} cm/360, same as {src.Label}";
+        ShowConvResult(true);
 
-        // Restating the distance next to a result that already is the distance would just be
-        // the same number twice.
+        // An answer on the card settles the one complaint the card can hold.
+        ConvError.Visibility = Visibility.Collapsed;
+
+        // A distance is not "at" a DPI: no DPI went into it, and the box's number played no
+        // part in what is on the card.
         if (dst.Direct)
+        {
+            ConvUnit.Visibility = Visibility.Collapsed;
             return;
+        }
 
-        ConvCm.Text = $"{src.Cm360:F1} cm/360";
-        ConvDot.Visibility = Visibility.Visible;
+        ConvUnit.Text = $"at {dpi:F0} DPI";
+    }
+
+    /// <summary>Swaps the result card between the answer and the prompt that stands in for
+    /// it. Both cannot be up at once: a number with "Pick a profile and a game." under it
+    /// would be describing something other than itself.</summary>
+    private void ShowConvResult(bool live)
+    {
+        var result = live ? Visibility.Visible : Visibility.Collapsed;
+        ConvResult.Visibility = result;
+        ConvUnit.Visibility = result;
+        ConvDetail.Visibility = result;
+        ConvEmpty.Visibility = live ? Visibility.Collapsed : Visibility.Visible;
+        ArmCopy(live);
     }
 
     /// <summary>Turns the result card's click-to-copy affordances on and off. A hand cursor
-    /// over a card reading "--" would be promising something there is nothing behind.</summary>
+    /// over a card that is asking for a profile would be promising something there is
+    /// nothing behind.</summary>
     private void ArmCopy(bool live)
     {
         ConvCard.Cursor = live ? Cursors.Hand : Cursors.Arrow;
-        ConvCard.ToolTip = live ? "Click to copy" : null;
+        ConvHint.Visibility = live ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void ConvCard_Click(object sender, MouseButtonEventArgs e)
@@ -1295,23 +1352,56 @@ public partial class MainWindow : Window
         Copy(ConvResult.Text);
     }
 
+    /// <summary>
+    /// Enter in any of the three fields does what Save to vault does, the same as the Create
+    /// panel's Enter and for the same reason: picking, typing a DPI and reaching for the
+    /// mouse is a step longer than the job needs.
+    ///
+    /// On the fields rather than on the panel, because the panel also holds the result card,
+    /// and PreviewKeyDown on the panel would take Enter from anything that lands in there
+    /// later. Handled is set only when the save actually ran.
+    /// </summary>
+    private void Convert_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+            return;
+
+        // An open list has first claim on Enter: it is how you take the entry under the
+        // highlight, which is most of what an editable game box is for.
+        if (sender is ComboBox { IsDropDownOpen: true })
+            return;
+
+        SaveConverted_Click(sender, e);
+        e.Handled = true;
+    }
+
     private void SaveConverted_Click(object sender, RoutedEventArgs e)
     {
         if (FromBox.SelectedItem is not SensProfile src || ToBox.SelectedItem is not Game dst)
         {
-            Warn("Pick a source profile and a target game.");
+            // One message, put at whichever half is missing -- and at the source first,
+            // because that is the half you fill in first.
+            const string missing = "Pick a source profile and a target game.";
+            if (FromBox.SelectedItem is SensProfile)
+                WarnAt(ToBox, ToError, missing);
+            else
+                WarnAt(FromBox, FromError, missing);
             return;
         }
         if (!TryNum(ToDpi.Text, out var dpi) && !dst.Direct)
         {
-            Warn("Target DPI must be a positive number.");
+            WarnAt(ToDpi, ToDpiError, "Target DPI must be a positive number.");
             return;
         }
 
         var sens = SensMath.SensFromCm360(dst.Direct, src.Cm360, dst.Yaw, dpi);
         if (sens <= 0)
         {
-            Warn("Nothing to convert yet.");
+            // The caption on its own, without WarnAt: this one is not about a field. It is
+            // the card saying it has nothing on it, and a card is a Border with no edge for
+            // FieldState to paint.
+            ConvError.Text = "Nothing to convert yet.";
+            ConvError.Visibility = Visibility.Visible;
             return;
         }
 
@@ -1332,6 +1422,7 @@ public partial class MainWindow : Window
         // Same as a saved draft: a row the vault did not have a moment ago, and a record of
         // an older step that no longer describes it.
         _undo = null;
+        ClearConvertWarnings();
         SetStatus($"Converted to {dst.Name} at {src.Cm360:F1} cm/360.");
     }
 
@@ -2237,6 +2328,17 @@ public partial class MainWindow : Window
         ClearWarning(SensBox, SensError);
         ClearWarning(DpiBox, DpiError);
         ClearWarning(CmBox, CmError);
+    }
+
+    /// <summary>The same, for the Convert panel. Its own method rather than three more lines
+    /// in the one above, because a save on one panel says nothing about what the other is
+    /// holding.</summary>
+    private void ClearConvertWarnings()
+    {
+        ClearWarning(FromBox, FromError);
+        ClearWarning(ToBox, ToError);
+        ClearWarning(ToDpi, ToDpiError);
+        ConvError.Visibility = Visibility.Collapsed;
     }
 
     private static double ParseOrZero(string? s) =>

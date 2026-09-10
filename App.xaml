@@ -120,6 +120,9 @@
         <Geometry x:Key="ChevronsLeft">M4.5,0 L0.5,4.5 L4.5,9 M9.5,0 L5.5,4.5 L9.5,9</Geometry>
         <!-- Two arrows passing each other, for the two boxes that write to one another. -->
         <Geometry x:Key="SyncIcon">M5,2 V14 M5,2 L2.5,4.5 M5,2 L7.5,4.5 M11,14 V2 M11,14 L13.5,11.5 M11,14 L8.5,11.5</Geometry>
+        <!-- One arrow, for the divider on the Convert panel: a conversion runs one way,
+             from the profile above it into the game below. -->
+        <Geometry x:Key="ArrowDownIcon">M8,2 V14 M8,14 L4,10 M8,14 L12,10</Geometry>
         <!-- Two sheets, the front one over the back, for the cells that copy on a click. -->
         <Geometry x:Key="CopyIcon">M6,6 H13 V13 H6 Z M3,10 V3 H10</Geometry>
         <Geometry x:Key="SearchIcon">M7,2.5 a4.5,4.5 0 1 0 0,9 a4.5,4.5 0 0 0 0,-9 Z M10.3,10.3 L14,14</Geometry>
