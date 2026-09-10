@@ -21,7 +21,13 @@
              Everything on the way in is eased. A linear fade reaches full opacity at a
              constant rate and reads as a pop; the ease-out front-loads the motion and
              then settles, which is what makes it feel like it arrived rather than
-             appeared. The rise runs longer than the fade so the two do not stop together. -->
+             appeared. The rise runs longer than the fade so the two do not stop together.
+
+             The pill is Hidden between toasts rather than only transparent. It hangs over
+             the rows, and once it has something to click (the Undo link) an invisible one
+             that still answered the mouse would swallow presses meant for the grid.
+             Putting it away is a keyframe rather than a flag set from code so that a
+             restart re-arms it exactly as it re-arms the fade. -->
         <Storyboard x:Key="ToastPop">
             <DoubleAnimation Storyboard.TargetName="Toast" Storyboard.TargetProperty="Opacity"
                              To="1" Duration="0:0:0.22">
@@ -43,6 +49,63 @@
                     <CubicEase EasingMode="EaseIn"/>
                 </DoubleAnimation.EasingFunction>
             </DoubleAnimation>
+            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="Toast"
+                                           Storyboard.TargetProperty="Visibility">
+                <DiscreteObjectKeyFrame KeyTime="0:0:0">
+                    <DiscreteObjectKeyFrame.Value>
+                        <Visibility>Visible</Visibility>
+                    </DiscreteObjectKeyFrame.Value>
+                </DiscreteObjectKeyFrame>
+                <DiscreteObjectKeyFrame KeyTime="0:0:1.7">
+                    <DiscreteObjectKeyFrame.Value>
+                        <Visibility>Hidden</Visibility>
+                    </DiscreteObjectKeyFrame.Value>
+                </DiscreteObjectKeyFrame>
+            </ObjectAnimationUsingKeyFrames>
+        </Storyboard>
+
+        <!-- The same toast, held six seconds instead of one and a quarter. What it carries
+             is an offer rather than a receipt: 1.25s is long enough to read "Copied  1.85"
+             and nowhere near long enough to read a sentence, decide against it and reach
+             for the link.
+
+             Written out in full because animations compose only with the ones begun beside
+             them. Splitting the hold into a second storyboard of its own would have its
+             fade replace the fade-in rather than follow it, and the pill would blink. -->
+        <Storyboard x:Key="ToastPopLong">
+            <DoubleAnimation Storyboard.TargetName="Toast" Storyboard.TargetProperty="Opacity"
+                             To="1" Duration="0:0:0.22">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="ToastShift" Storyboard.TargetProperty="Y"
+                             From="12" To="0" Duration="0:0:0.32">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="Toast" Storyboard.TargetProperty="Opacity"
+                             To="0" BeginTime="0:0:6" Duration="0:0:0.45"/>
+            <DoubleAnimation Storyboard.TargetName="ToastShift" Storyboard.TargetProperty="Y"
+                             To="8" BeginTime="0:0:6" Duration="0:0:0.45">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseIn"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="Toast"
+                                           Storyboard.TargetProperty="Visibility">
+                <DiscreteObjectKeyFrame KeyTime="0:0:0">
+                    <DiscreteObjectKeyFrame.Value>
+                        <Visibility>Visible</Visibility>
+                    </DiscreteObjectKeyFrame.Value>
+                </DiscreteObjectKeyFrame>
+                <DiscreteObjectKeyFrame KeyTime="0:0:6.45">
+                    <DiscreteObjectKeyFrame.Value>
+                        <Visibility>Hidden</Visibility>
+                    </DiscreteObjectKeyFrame.Value>
+                </DiscreteObjectKeyFrame>
+            </ObjectAnimationUsingKeyFrames>
         </Storyboard>
 
         <Style x:Key="Trimmed" TargetType="TextBlock">
@@ -97,7 +160,7 @@
                 </TabControl.Tag>
 
                 <!-- add a profile -->
-                <TabItem Header="Create">
+                <TabItem Header="Create" ToolTip="Create (Ctrl+N)">
                     <ScrollViewer x:Name="CreateScroll" VerticalScrollBarVisibility="Auto"
                                   Margin="0,8,0,0">
                         <StackPanel x:Name="DraftPanel"
@@ -388,7 +451,7 @@
                              Style="{StaticResource SearchBox}"
                              local:Chrome.Placeholder="Search name or game"
                              TextChanged="Search_TextChanged"
-                             ToolTip="Filter by name or game"/>
+                             ToolTip="Filter by name or game (Ctrl+F)"/>
 
                     <!-- Sits at the end of the bar, directly over where the grid's scrollbar
                          starts, so hiding and showing it happens in the one spot. -->
@@ -609,7 +672,8 @@
                                MouseLeftButtonUp="ClearSearch_Click"/>
                 </StackPanel>
 
-                <Border Grid.Row="1" x:Name="Toast" Opacity="0" IsHitTestVisible="False"
+                <Border Grid.Row="1" x:Name="Toast" Opacity="0" Visibility="Hidden"
+                        IsHitTestVisible="False"
                         HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,24"
                         Background="{DynamicResource Surface1}" CornerRadius="{DynamicResource RadPill}" Padding="16,8">
                     <Border.RenderTransform>
@@ -618,8 +682,33 @@
                     <Border.Effect>
                         <DropShadowEffect BlurRadius="14" ShadowDepth="3" Opacity="0.55" Color="#000000"/>
                     </Border.Effect>
-                    <TextBlock x:Name="ToastText" Foreground="{DynamicResource Text}"
-                               FontSize="{StaticResource FontSecondary}"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="ToastText" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Text}"
+                                   FontSize="{StaticResource FontSecondary}"/>
+
+                        <!-- The way back out of whatever the line in front of it just said.
+                             Up only for the toasts that have something to take back, so a
+                             copy still shows the plain pill it always did. The key beside
+                             the link is the same offer to the hands already on the keyboard,
+                             and it says which key without spending a sentence on it.
+                             Transparent so the whole word takes the click rather than only
+                             the letters of it. -->
+                        <StackPanel x:Name="ToastAction" Orientation="Horizontal"
+                                    Visibility="Collapsed">
+                            <TextBlock Text="Undo" Background="Transparent" Cursor="Hand"
+                                       VerticalAlignment="Center" Margin="12,0,0,0"
+                                       FontSize="{StaticResource FontBody}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Accent}"
+                                       MouseLeftButtonUp="ToastUndo_Click"/>
+                            <Border Background="{DynamicResource Surface2}" Padding="4,1"
+                                    CornerRadius="{DynamicResource RadSm}"
+                                    VerticalAlignment="Center" Margin="6,0,0,0">
+                                <TextBlock Text="Ctrl+Z" Foreground="{DynamicResource Subtext}"
+                                           FontSize="{StaticResource FontCaption}"/>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
                 </Border>
             </Grid>
 

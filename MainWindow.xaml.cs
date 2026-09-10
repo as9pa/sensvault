@@ -614,6 +614,12 @@ public partial class MainWindow : Window
 
         _profiles.Add(p);
 
+        // Nothing to offer taking back -- the row is what was just asked for -- but the
+        // record has to go all the same. Undo is one step, and the step it holds has to be
+        // the last thing that happened, or Ctrl+Z reaches past this row to a vault that is
+        // no longer the one on screen.
+        _undo = null;
+
         // Clear what belongs to the one sensitivity just saved -- its name and its two number
         // boxes -- and keep what belongs to the session. The DPI is the mouse's and does not
         // change between entries, and the game is usually the same for a run of them, so
@@ -646,10 +652,16 @@ public partial class MainWindow : Window
         if (doomed.Count == 0)
             return;
 
+        // Where each row sits now, taken before any of them has gone: the moment the first
+        // one is out, every index after it is one too high. See Undo for the way back.
+        var what = Which(doomed);
+        _undo = (what, doomed.Select(p => (Profile: p, Index: _profiles.IndexOf(p))).ToList(), []);
+
         foreach (var p in doomed)
             _profiles.Remove(p);
         Renumber();
         SetStatus($"Deleted {doomed.Count} profile{(doomed.Count == 1 ? "" : "s")}.");
+        ShowToast($"Deleted {what}", undoable: true);
     }
 
     /// <summary>
@@ -669,16 +681,21 @@ public partial class MainWindow : Window
         if (_reorder.IsReordering || Grid_.SelectedItems.Count == 0)
             return false;
 
-        // Wherever text is being typed -- the entry panel's boxes, the game cell's editable
-        // combo, an open cell editor -- Delete belongs to the caret and not to the row.
-        if (Keyboard.FocusedElement is TextBoxBase)
-            return false;
-        if (Rows.Parent<DataGridCell>(Keyboard.FocusedElement)?.IsEditing == true)
+        // Wherever text is being typed, Delete belongs to the caret and not to the row.
+        if (Typing())
             return false;
 
         DeleteSelected();
         return true;
     }
+
+    /// <summary>True while the keys belong to a caret rather than to the vault: one of the
+    /// entry panel's boxes, the game cell's editable combo, an open cell editor.</summary>
+    private static bool Typing() => Keyboard.FocusedElement is TextBoxBase || EditingCell();
+
+    /// <summary>True while a cell of the grid is open for editing.</summary>
+    private static bool EditingCell() =>
+        Rows.Parent<DataGridCell>(Keyboard.FocusedElement)?.IsEditing == true;
 
     /// <summary>
     /// Clicking anywhere that is not a profile row drops the selection, so the vault never
@@ -826,6 +843,7 @@ public partial class MainWindow : Window
         // is where you look for it. Walked back to front so inserting cannot shift an index
         // that has not been used yet.
         SensProfile? landed = null;
+        var copies = new List<SensProfile>();
         foreach (var source in picked.OrderByDescending(_profiles.IndexOf))
         {
             var copy = source.Clone();
@@ -833,12 +851,19 @@ public partial class MainWindow : Window
                 copy.Name += " copy";
 
             _profiles.Insert(_profiles.IndexOf(source) + 1, copy);
+            copies.Add(copy);
             landed = copy;
         }
 
         Renumber();
         SelectOnly(landed);
         SetStatus($"Duplicated {Count(picked.Count)}.");
+
+        // Named after the rows duplicated rather than the copies: the copy of "cs" is
+        // called "cs copy", and "Duplicated cs copy" is not what just happened.
+        var what = Which(picked);
+        _undo = (what, [], copies);
+        ShowToast($"Duplicated {what}", undoable: true);
     }
 
     private void RowDelete_Click(object sender, RoutedEventArgs e) => DeleteSelected();
@@ -867,8 +892,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        ToastText.Text = $"Copied  {Count(picked.Count)}";
-        ((Storyboard)FindResource("ToastPop")).Begin(this, isControllable: true);
+        ShowToast($"Copied  {Count(picked.Count)}");
     }
 
     private void RowPaste_Click(object sender, RoutedEventArgs e)
@@ -892,6 +916,10 @@ public partial class MainWindow : Window
         Renumber();
         SelectOnly(landed);
         SetStatus($"Pasted {Count(pasted.Count)}.");
+
+        var what = Which(pasted);
+        _undo = (what, [], pasted);
+        ShowToast($"Pasted {what}", undoable: true);
     }
 
     private bool HasProfilesOnClipboard()
@@ -946,6 +974,12 @@ public partial class MainWindow : Window
     }
 
     private static string Count(int n) => $"{n} profile{(n == 1 ? "" : "s")}";
+
+    /// <summary>What a toast calls a set of rows: the one row by its own label, or how many
+    /// there are. A single row is worth naming -- "Deleted oak" says which one went in a way
+    /// "Deleted 1 profile" does not -- and past one there is no name that covers them.</summary>
+    private static string Which(List<SensProfile> rows) =>
+        rows.Count == 1 ? rows[0].Label : Count(rows.Count);
 
     private void SelectOnly(SensProfile? p)
     {
@@ -1027,8 +1061,95 @@ public partial class MainWindow : Window
             return;
         }
 
-        ToastText.Text = $"Copied  {text}";
-        ((Storyboard)FindResource("ToastPop")).Begin(this, isControllable: true);
+        ShowToast($"Copied  {text}");
+    }
+
+    // ---------- the toast ----------
+
+    /// <summary>
+    /// Raises the pill with <paramref name="text"/> on it.
+    ///
+    /// An undoable action passes true, which puts the Undo link and its key hint on the end
+    /// of the line and holds the pill up for six seconds instead of one and a quarter. A
+    /// receipt only has to be read; an offer has to be read, weighed and reached for.
+    /// </summary>
+    private void ShowToast(string text, bool undoable = false)
+    {
+        ToastText.Text = text;
+        ToastAction.Visibility = undoable ? Visibility.Visible : Visibility.Collapsed;
+
+        // Only a pill with something to click takes the mouse. The rest of the time it hangs
+        // over the grid's own rows with no business intercepting anything, which is what it
+        // has always done. The storyboards hide it at the end of either hold, so this is
+        // never left to be taken back.
+        Toast.IsHitTestVisible = undoable;
+
+        var pop = (Storyboard)FindResource(undoable ? "ToastPopLong" : "ToastPop");
+        pop.Begin(this, isControllable: true);
+    }
+
+    // ---------- undo ----------
+
+    /// <summary>
+    /// What the last mutation did, and nothing before it. Rows it took out, each with the
+    /// index it came from; rows it put in, which come back out by reference.
+    ///
+    /// One step rather than a stack: the vault is a list you keep, not a document you work
+    /// on, and the mistake worth an escape hatch is the one you have just noticed. A stack
+    /// would also have to answer what an edit to a restored row means, and there is no
+    /// answer to that which is worth the weight.
+    /// </summary>
+    private (
+        string Label,
+        List<(SensProfile Profile, int Index)> Removed,
+        List<SensProfile> Added
+    )? _undo;
+
+    private void ToastUndo_Click(object sender, MouseButtonEventArgs e) => Undo();
+
+    /// <summary>
+    /// Puts the last step back.
+    ///
+    /// Ascending index order is what makes the rows land where they came from: every insert
+    /// shifts what is after it down by one, so walking up means each saved index is looking
+    /// at the same slot it left. Going down the other way would measure each index against a
+    /// list still missing the rows below it.
+    ///
+    /// The clamp is for a vault that has shrunk under the record. Nothing in the app can do
+    /// that -- every mutation replaces the record -- but an index past the end is an
+    /// exception rather than a misplaced row, and the end of the list is the nearest thing
+    /// to where it belongs.
+    /// </summary>
+    private void Undo()
+    {
+        if (_undo is not { } step)
+            return;
+
+        // A drag owns the collection's order until it lands, and rows put back into it
+        // mid-gesture would move the ground under the one being dragged. TryDeleteSelection
+        // stands off for the same reason.
+        if (_reorder.IsReordering)
+            return;
+
+        // An open editor has to be put away first. A refused commit leaves the vault as it
+        // is, and the step unspent, so it is still there to take once the cell is settled.
+        if (!Grid_.CommitEdit(DataGridEditingUnit.Row, exitEditingMode: true))
+            return;
+
+        // Taken, not read: there is one step and nothing behind it, so a second Ctrl+Z has
+        // nothing to do rather than something to do twice.
+        _undo = null;
+
+        foreach (var (profile, index) in step.Removed.OrderBy(r => r.Index))
+            _profiles.Insert(Math.Min(index, _profiles.Count), profile);
+
+        foreach (var profile in step.Added)
+            _profiles.Remove(profile);
+
+        Renumber();
+        RefreshView();
+        SetStatus($"Restored {step.Label}.");
+        ShowToast($"Restored {step.Label}");
     }
 
     // ---------- drag to reorder ----------
@@ -1200,6 +1321,10 @@ public partial class MainWindow : Window
                 Notes = $"Converted from {src.Label}",
             }
         );
+
+        // Same as a saved draft: a row the vault did not have a moment ago, and a record of
+        // an older step that no longer describes it.
+        _undo = null;
         SetStatus($"Converted to {dst.Name} at {src.Cm360:F1} cm/360.");
     }
 
@@ -1666,8 +1791,44 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (e.Key == Key.Escape && TryEscape())
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (Keyboard.Modifiers != ModifierKeys.Control)
             return;
+
+        // The three that are not zoom. Each of them either moves the keyboard somewhere or
+        // changes the vault, so each answers for the keystroke itself rather than falling
+        // through to the step below.
+        if (e.Key == Key.F)
+        {
+            FocusSearch();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.N)
+        {
+            FocusDraft();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Z)
+        {
+            // Wherever text is being typed the caret has an undo of its own, and it is a far
+            // smaller thing to be asking for than the vault's. Left unhandled, so the box
+            // gets the keystroke exactly as it would anywhere else in Windows.
+            if (Typing())
+                return;
+
+            Undo();
+            e.Handled = true;
+            return;
+        }
 
         // Both rows of keys: OemPlus/OemMinus on the main block, Add/Subtract on the numpad.
         // D0 and NumPad0 reset, matching what every browser does.
@@ -1687,6 +1848,70 @@ public partial class MainWindow : Window
 
         Save();
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// Ctrl+F. The bar can be folded away, and a shortcut that put the caret in a box nobody
+    /// can see would be no shortcut at all -- so it comes back first, through the same call
+    /// the show button makes, which is what keeps the window's own floor right.
+    ///
+    /// Select-all rather than a caret at the end: what follows Ctrl+F is a new search far
+    /// more often than a correction to the last one, and this way either one costs nothing.
+    /// </summary>
+    private void FocusSearch()
+    {
+        if (FilterBar.Visibility != Visibility.Visible)
+            ShowFilterBar(true);
+
+        Search.Focus();
+        Search.SelectAll();
+    }
+
+    /// <summary>
+    /// Ctrl+N. Same story as Ctrl+F for the panel the Create tab sits on, and one more
+    /// besides: a tab's content is built on the layout pass that follows the pick, and a box
+    /// that is not in the tree yet cannot take focus. Hence the forced pass between them.
+    /// </summary>
+    private void FocusDraft()
+    {
+        if (LeftPanel.Visibility != Visibility.Visible)
+            ShowLeftPanel(true);
+
+        Tabs.SelectedIndex = 0;
+        Tabs.UpdateLayout();
+        NameBox.Focus();
+    }
+
+    /// <summary>
+    /// Esc, and what it takes back depends on what is holding something. The search box
+    /// first, because a filter is the thing most often standing between you and the rows;
+    /// then the selection, which is the other thing on screen that Esc is expected to drop.
+    ///
+    /// Three things own Esc outright and are left it: an open cell editor, where it reverts
+    /// the cell; a drag in flight, where it puts the row back (RowReorder hooks this same
+    /// window event, and is registered after this handler); and an open drop-down, where it
+    /// closes the list. The game box in the entry panel is the third of those, which is why
+    /// this asks about the combo as well as the cell.
+    /// </summary>
+    private bool TryEscape()
+    {
+        if (EditingCell() || _reorder.IsReordering)
+            return false;
+        if (Rows.Parent<ComboBox>(Keyboard.FocusedElement) is { IsDropDownOpen: true })
+            return false;
+
+        if (Search.IsKeyboardFocusWithin && Search.Text.Length > 0)
+        {
+            Search.Clear();
+            return true;
+        }
+
+        if (Grid_.SelectedItems.Count == 0)
+            return false;
+
+        Grid_.UnselectAll();
+        Grid_.CurrentCell = default;
+        return true;
     }
 
     private void Window_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
