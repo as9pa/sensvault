@@ -492,7 +492,9 @@ public partial class MainWindow : Window
     /// </summary>
     private void UpdateCmPlaceholder()
     {
-        if (CmPlaceholder is null)
+        // GameBox_SelectionChanged can arrive mid-parse too, when the box it wants to read
+        // and the prompt it wants to place are both still to come.
+        if (GameBox is null || CmBox is null || CmPlaceholder is null)
             return;
 
         CmPlaceholder.Visibility =
@@ -1874,15 +1876,32 @@ public partial class MainWindow : Window
     /// </summary>
     private void WarnAt(Control field, TextBlock caption, string message)
     {
+        // Nothing reaches this before the window is up -- only a Save can -- but a pair of
+        // helpers that write and unwrite the same two elements should not have one rule each.
+        if (field is null || caption is null)
+            return;
+
         FieldState.SetIsInvalid(field, true);
         caption.Text = message;
         caption.Visibility = Visibility.Visible;
     }
 
-    /// <summary>Takes back what <see cref="WarnAt"/> said. The message is left in place, so a
-    /// complaint that comes straight back does not blink through empty.</summary>
+    /// <summary>
+    /// Takes back what <see cref="WarnAt"/> said. The message is left in place, so a
+    /// complaint that comes straight back does not blink through empty.
+    ///
+    /// Guarded because it runs before the window is built. SensBox carries Text="1" in the
+    /// XAML, and assigning that raises its TextChanged while the panel is still being parsed
+    /// -- at which point the box itself exists but the caption under it, declared after it,
+    /// is still null. Same hazard and same answer as Tabs_SelectionChanged and
+    /// ShowSettingsPage: check the elements, not a readiness flag, because the constructor
+    /// legitimately calls into this side of the panel before it sets one.
+    /// </summary>
     private static void ClearWarning(Control field, TextBlock caption)
     {
+        if (field is null || caption is null)
+            return;
+
         FieldState.SetIsInvalid(field, false);
         caption.Visibility = Visibility.Collapsed;
     }
