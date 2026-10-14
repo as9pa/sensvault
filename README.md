@@ -1,5 +1,7 @@
 # SensVault
 
+![The SensVault window: the Create panel on the left, the vault of sensitivities with sens, DPI and cm/360 on the right](docs/images/main.png)
+
 An easy place to store your mouse sensitivities across a library of games.
 
 **[Download](https://github.com/as9pa/sensvault/releases/latest)** (Windows x64)
