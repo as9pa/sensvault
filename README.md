@@ -17,6 +17,8 @@ An easy place to store your mouse sensitivities across a library of games.
 - **Themes:** pick one and it is saved with your vault.
 - **Saved for you:** data lives in `%APPDATA%\SensVault\data.json`.
 
+![The Convert tab: a Valorant profile turned into a Counter-Strike 2 sensitivity at the same cm/360](docs/images/convert.png)
+
 ## Download
 
 Requires Windows x64.
